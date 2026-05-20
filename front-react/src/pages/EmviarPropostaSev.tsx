@@ -120,7 +120,7 @@ export default function EnviarPropostaSev() {
               <textarea
                 value={mensagem}
                 onChange={(e) => setMensagem(e.target.value)}
-                rows="4"
+                rows={4}
                 required
               ></textarea>
             </div>

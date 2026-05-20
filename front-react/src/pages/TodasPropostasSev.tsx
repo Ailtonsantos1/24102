@@ -1,32 +1,45 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom'; // Import necessário para o link dinâmico
+import { Link, useNavigate } from 'react-router-dom';
+import { PropostaServico } from '../lib/types';
 
-const TodasPropostasSev = () => {
+type FiltroProposta = 'all' | 'aguardando' | 'aceita' | 'recusada';
+
+const TodasPropostasSev: React.FC = () => {
   const navigate = useNavigate();
   const PROPOSTAS_KEY = 'minhasPropostas';
-  const [propostas, setPropostas] = useState([]);
-  const [currentFilter, setCurrentFilter] = useState('all');
-  const [toastMessage, setToastMessage] = useState(null);
-  const [toastType, setToastType] = useState('');
 
-  const showToast = (msg, bgColor = '#1f2e3a', isError = false) => {
+  const [propostas, setPropostas] = useState<PropostaServico[]>([]);
+  const [currentFilter, setCurrentFilter] = useState<FiltroProposta>('all');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastType, setToastType] = useState<'success' | 'error' | 'normal'>(
+    'normal'
+  );
+
+  const showToast = (
+    msg: string,
+    _bgColor?: string,
+    isError: boolean = false
+  ) => {
     setToastMessage(msg);
     setToastType(isError ? 'error' : 'normal');
     setTimeout(() => setToastMessage(null), 2800);
   };
 
-  const showSuccessToast = (msg) => {
+  const showSuccessToast = (msg: string) => {
     setToastMessage(msg);
     setToastType('success');
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const getPropostas = useCallback(() => {
+  const getPropostas = useCallback((): PropostaServico[] => {
     const stored = localStorage.getItem(PROPOSTAS_KEY);
     if (stored) {
       try {
-        let propostas = JSON.parse(stored);
-        propostas.sort((a, b) => new Date(b.data) - new Date(a.data));
+        let propostas: PropostaServico[] = JSON.parse(stored);
+        // CORREÇÃO: usar getTime() para evitar erro TS2362/2363
+        propostas.sort(
+          (a, b) => new Date(b.data).getTime() - new Date(a.data).getTime()
+        );
         return propostas;
       } catch (e) {
         return [];
@@ -35,22 +48,22 @@ const TodasPropostasSev = () => {
     return [];
   }, []);
 
-  const savePropostas = useCallback((propostasArray) => {
+  const savePropostas = useCallback((propostasArray: PropostaServico[]) => {
     localStorage.setItem(PROPOSTAS_KEY, JSON.stringify(propostasArray));
   }, []);
 
-  const seedExamplePropostas = useCallback(() => {
+  const seedExamplePropostas = useCallback((): PropostaServico[] => {
     const existing = getPropostas();
     if (existing.length === 0) {
-      const examplePropostas = [
+      const examplePropostas: PropostaServico[] = [
         {
           id: Date.now() + 1,
-          servicoId: 'servico_exemplo_1', // ID fictício para exemplo
+          servicoId: 'servico_exemplo_1',
           cliente: 'Empresa Sabor & Vida',
           servico: 'Instalação de quadro de luz',
           mensagem:
             'Olá! Sou eletricista especializado, posso realizar a instalação ainda hoje com garantia. Tenho 8 anos de experiência em quadros industriais. Orçamento detalhado.',
-          valor: 'R$ 1.200,00',
+          valor: 1200,
           data: new Date(Date.now() - 86400000).toISOString(),
           status: 'aguardando',
           profissional: 'João Elétrica',
@@ -62,7 +75,7 @@ const TodasPropostasSev = () => {
           servico: 'Manutenção elétrica geral',
           mensagem:
             'Boa tarde! Posso fazer uma vistoria completa e substituir disjuntores com segurança. Valor justo e nota fiscal.',
-          valor: 'Negociável',
+          valor: 1200,
           data: new Date(Date.now() - 172800000).toISOString(),
           status: 'aceita',
           profissional: 'João Elétrica',
@@ -74,7 +87,7 @@ const TodasPropostasSev = () => {
           servico: 'Troca de chuveiro industrial',
           mensagem:
             'Disponibilidade imediata para troca do chuveiro. Preço especial para primeiro serviço.',
-          valor: 'R$ 350,00',
+          valor: 350,
           data: new Date(Date.now() - 259200000).toISOString(),
           status: 'recusada',
           profissional: 'João Elétrica',
@@ -96,14 +109,12 @@ const TodasPropostasSev = () => {
     if (currentFilter === 'aguardando') {
       return proposta.status === 'aguardando' || proposta.status === 'enviada';
     }
-    if (currentFilter === 'aceita') return proposta.status === 'aceita';
-    if (currentFilter === 'recusada') return proposta.status === 'recusada';
-    return true;
+    return proposta.status === currentFilter;
   });
 
-  const escapeHtml = (str) => {
+  const escapeHtml = (str: string): string => {
     if (!str) return '';
-    return str.replace(/[&<>]/g, function (m) {
+    return str.replace(/[&<>]/g, (m) => {
       if (m === '&') return '&amp;';
       if (m === '<') return '&lt;';
       if (m === '>') return '&gt;';
@@ -111,7 +122,7 @@ const TodasPropostasSev = () => {
     });
   };
 
-  const renderPropostas = () => {
+  const renderPropostas = (): React.ReactNode => {
     if (filteredPropostas.length === 0) {
       return (
         <div className="empty-state" id="emptyState">
@@ -127,101 +138,117 @@ const TodasPropostasSev = () => {
       );
     }
 
-    return filteredPropostas.map((proposta) => {
-      let statusClass = '';
-      let statusText = '';
-      if (proposta.status === 'aguardando' || proposta.status === 'enviada') {
-        statusClass = 'status-aguardando';
-        statusText = '⏳ Aguardando resposta';
-      } else if (proposta.status === 'aceita') {
-        statusClass = 'status-aceita';
-        statusText = '✅ Aceita';
-      } else if (proposta.status === 'recusada') {
-        statusClass = 'status-recusada';
-        statusText = '❌ Recusada';
-      } else {
-        statusClass = 'status-aguardando';
-        statusText = '⏳ Pendente';
-      }
+    return (
+      <>
+        {filteredPropostas.map((proposta) => {
+          let statusClass = '';
+          let statusText = '';
+          if (
+            proposta.status === 'aguardando' ||
+            proposta.status === 'enviada'
+          ) {
+            statusClass = 'status-aguardando';
+            statusText = '⏳ Aguardando resposta';
+          } else if (proposta.status === 'aceita') {
+            statusClass = 'status-aceita';
+            statusText = '✅ Aceita';
+          } else if (proposta.status === 'recusada') {
+            statusClass = 'status-recusada';
+            statusText = '❌ Recusada';
+          } else {
+            statusClass = 'status-aguardando';
+            statusText = '⏳ Pendente';
+          }
 
-      let valorDisplay = proposta.valor || 'Não informado';
-      if (valorDisplay !== 'Não informado' && !valorDisplay.includes('R$')) {
-        valorDisplay = `R$ ${valorDisplay}`;
-      }
+          let valorDisplay = proposta.valor || 'Não informado';
+          if (
+            proposta.valor !== undefined &&
+            !proposta.valor.toString().includes('R$')
+          ) {
+            valorDisplay = `R$ ${proposta.valor.toFixed(2)}`;
+          }
 
-      const dataObj = new Date(proposta.data);
-      const dataFormatada =
-        dataObj.toLocaleDateString('pt-BR') +
-        ' às ' +
-        dataObj.toLocaleTimeString('pt-BR', {
-          hour: '2-digit',
-          minute: '2-digit',
-        });
+          const dataObj = new Date(proposta.data);
+          const dataFormatada =
+            dataObj.toLocaleDateString('pt-BR') +
+            ' às ' +
+            dataObj.toLocaleTimeString('pt-BR', {
+              hour: '2-digit',
+              minute: '2-digit',
+            });
 
-      return (
-        <div className="proposal-card" key={proposta.id} data-id={proposta.id}>
-          <div className="card-header">
-            <div className="client-info">
-              <h3>{escapeHtml(proposta.cliente || 'Cliente')}</h3>
-              <div className="service-tag">
-                🔧 {escapeHtml(proposta.servico || 'Serviço genérico')}
+          return (
+            <div
+              className="proposal-card"
+              key={proposta.id}
+              data-id={proposta.id}
+            >
+              <div className="card-header">
+                <div className="client-info">
+                  <h3>{escapeHtml(proposta.cliente || 'Cliente')}</h3>
+                  <div className="service-tag">
+                    🔧 {escapeHtml(proposta.servico || 'Serviço genérico')}
+                  </div>
+                </div>
+                <div className={`status-badge ${statusClass}`}>
+                  {statusText}
+                </div>
+              </div>
+              <div className="proposal-details">
+                <div className="proposal-message">
+                  <strong>💬 Mensagem:</strong>
+                  <br />
+                  {escapeHtml(
+                    proposta.mensagem.length > 150
+                      ? proposta.mensagem.substring(0, 150) + '...'
+                      : proposta.mensagem
+                  )}
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '8px',
+                    marginTop: '8px',
+                  }}
+                >
+                  <span className="proposal-value">
+                    💰{' '}
+                    {escapeHtml(proposta.valor.toString() || 'Não informado')}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '0.7rem',
+                      background: '#f0f4fa',
+                      padding: '2px 12px',
+                      borderRadius: '60px',
+                    }}
+                  >
+                    📅 {dataFormatada}
+                  </span>
+                </div>
+              </div>
+              <div className="proposal-date">
+                <span>
+                  📨 Enviada por: {escapeHtml(proposta.profissional || 'Você')}
+                </span>
+                <Link
+                  to={`/detalhe-servico/${proposta.servicoId}`}
+                  className="detail-link"
+                >
+                  Ver detalhes →
+                </Link>
               </div>
             </div>
-            <div className={`status-badge ${statusClass}`}>{statusText}</div>
-          </div>
-          <div className="proposal-details">
-            <div className="proposal-message">
-              <strong>💬 Mensagem:</strong>
-              <br />
-              {escapeHtml(
-                proposta.mensagem.length > 150
-                  ? proposta.mensagem.substring(0, 150) + '...'
-                  : proposta.mensagem
-              )}
-            </div>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                flexWrap: 'wrap',
-                gap: '8px',
-                marginTop: '8px',
-              }}
-            >
-              <span className="proposal-value">
-                💰 {escapeHtml(valorDisplay)}
-              </span>
-              <span
-                style={{
-                  fontSize: '0.7rem',
-                  background: '#f0f4fa',
-                  padding: '2px 12px',
-                  borderRadius: '60px',
-                }}
-              >
-                📅 {dataFormatada}
-              </span>
-            </div>
-          </div>
-          <div className="proposal-date">
-            <span>
-              📨 Enviada por: {escapeHtml(proposta.profissional || 'Você')}
-            </span>
-            {/* Link dinâmico usando React Router */}
-            <Link
-              to={`/detalhe-servico/${proposta.servicoId}`}
-              className="detail-link"
-            >
-              Ver detalhes →
-            </Link>
-          </div>
-        </div>
-      );
-    });
+          );
+        })}
+      </>
+    );
   };
 
-  const handleLogout = (e) => {
+  const handleLogout = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
     if (window.confirm('Deseja realmente sair da sua conta?')) {
       localStorage.removeItem('homeUserName');
@@ -236,7 +263,7 @@ const TodasPropostasSev = () => {
   useEffect(() => {
     loadPropostas();
 
-    const handleStorageChange = (event) => {
+    const handleStorageChange = (event: StorageEvent) => {
       if (event.key === PROPOSTAS_KEY) {
         loadPropostas();
       }
@@ -252,13 +279,11 @@ const TodasPropostasSev = () => {
       const total = getPropostas().length;
       if (total > 0) {
         showToast(
-          `📬 Você tem ${total} proposta(s) no total. Use os filtros para organizar.`,
-          '#2c5a6e'
+          `📬 Você tem ${total} proposta(s) no total. Use os filtros para organizar.`
         );
       } else {
         showToast(
-          "Envie sua primeira proposta clicando em 'Tenho interesse' em algum serviço",
-          '#c96f0e'
+          "Envie sua primeira proposta clicando em 'Tenho interesse' em algum serviço"
         );
       }
     }, 400);
@@ -270,7 +295,7 @@ const TodasPropostasSev = () => {
     };
   }, [loadPropostas, getPropostas]);
 
-  // Estilos originais (mantidos exatamente iguais)
+  // ========== ESTILOS (mantidos originais) ==========
   const styles = `
     * {
       margin: 0;

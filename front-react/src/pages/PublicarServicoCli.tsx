@@ -1,23 +1,37 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, ChangeEvent, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Toast } from '../components/Toast';
+import { UploadedFile, ToastState, ServicoPublicado } from '../lib/types';
 
-const PublicarServico = () => {
+// Tipos locais (usados apenas neste componente)
+interface FormData {
+  titulo: string;
+  descricao: string;
+  categoria: string;
+  preco: number;
+  urgente: boolean;
+  contato: string;
+  localizacao: string;
+}
+
+const PublicarServico: React.FC = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
+
+  const [formData, setFormData] = useState<FormData>({
     titulo: '',
     descricao: '',
     categoria: '',
-    preco: '',
+    preco: 0,
     urgente: false,
     contato: '',
     localizacao: '',
   });
-  const [fotos, setFotos] = useState([]);
-  const [toast, setToast] = useState(null);
-  const fileInputRef = useRef(null);
 
-  const categorias = [
+  const [fotos, setFotos] = useState<UploadedFile[]>([]);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const categorias: string[] = [
     'Elétrica',
     'Hidráulica',
     'Pintura',
@@ -26,41 +40,43 @@ const PublicarServico = () => {
     'Outros',
   ];
 
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
+  const handleChange = (
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value, type } = e.target;
+    const checked = (e.target as HTMLInputElement).checked;
     setFormData((prev) => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
     }));
   };
 
-  const handleUploadClick = () => fileInputRef.current.click();
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
 
-  // Converte arquivo para base64
-  const fileToBase64 = (file) => {
+  const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result);
+      reader.onload = () => resolve(reader.result as string);
       reader.onerror = (error) => reject(error);
     });
   };
 
-  // Manipula o upload e salva o base64
-  const handleFileChange = async (e) => {
-    const files = Array.from(e.target.files);
+  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
     for (const file of files) {
       const base64 = await fileToBase64(file);
       setFotos((prev) => [...prev, { base64, name: file.name }]);
     }
   };
 
-  // Remove uma foto do estado
-  const removerFoto = (index) => {
+  const removerFoto = (index: number) => {
     setFotos((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const validarFormulario = () => {
+  const validarFormulario = (): boolean => {
     if (!formData.titulo.trim()) {
       mostrarToast('Informe o título', true);
       return false;
@@ -73,7 +89,7 @@ const PublicarServico = () => {
       mostrarToast('Selecione uma categoria', true);
       return false;
     }
-    if (!formData.preco || isNaN(formData.preco)) {
+    if (!formData.preco || isNaN(Number(formData.preco))) {
       mostrarToast('Informe um valor válido', true);
       return false;
     }
@@ -88,25 +104,30 @@ const PublicarServico = () => {
     return true;
   };
 
-  const mostrarToast = (msg, isError = false) => {
+  const mostrarToast = (msg: string, isError: boolean = false) => {
     setToast({ message: msg, isError });
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (validarFormulario()) {
-      const novoServico = {
+      const novoServico: ServicoPublicado = {
         id: Date.now().toString(),
-        ...formData,
-        preco: parseFloat(formData.preco),
-        fotos: fotos.map((f) => f.base64), // salva os base64
+        titulo: formData.titulo,
+        descricao: formData.descricao,
+        categoria: formData.categoria,
+        preco: formData.preco,
+        urgente: formData.urgente,
+        contato: formData.contato,
+        localizacao: formData.localizacao,
+        fotos: fotos.map((f) => f.base64),
         dataPublicacao: new Date().toISOString(),
         clienteId: localStorage.getItem('clienteId') || 'cliente@email.com',
         clienteNome: localStorage.getItem('clienteNome') || 'João Silva',
         status: 'aberto',
       };
-      const servicos = JSON.parse(
+      const servicos: ServicoPublicado[] = JSON.parse(
         localStorage.getItem('servicos_publicados') || '[]'
       );
       servicos.push(novoServico);
@@ -173,6 +194,7 @@ const PublicarServico = () => {
               onChange={handleChange}
             />
           </div>
+
           <div className="field-group">
             <div className="field-label">
               <i className="fas fa-align-left"></i> Descrição detalhada{' '}
@@ -188,6 +210,7 @@ const PublicarServico = () => {
               Seja o mais claro possível para atrair clientes qualificados.
             </div>
           </div>
+
           <div className="field-group">
             <div className="field-label">
               <i className="fas fa-camera"></i> Fotos do serviço
@@ -235,6 +258,7 @@ const PublicarServico = () => {
               </div>
             )}
           </div>
+
           <div className="field-group">
             <div className="field-label">
               <i className="fas fa-tags"></i> Categoria{' '}
@@ -259,6 +283,7 @@ const PublicarServico = () => {
               ))}
             </div>
           </div>
+
           <div className="double-row">
             <div className="field-group">
               <div className="field-label">
@@ -274,6 +299,7 @@ const PublicarServico = () => {
                 step="0.01"
               />
             </div>
+
             <div className="field-group">
               <div className="field-label">
                 <i className="fas fa-bolt"></i> Urgência
@@ -289,6 +315,7 @@ const PublicarServico = () => {
               </label>
             </div>
           </div>
+
           <div className="double-row">
             <div className="field-group">
               <div className="field-label">
@@ -303,6 +330,7 @@ const PublicarServico = () => {
                 onChange={handleChange}
               />
             </div>
+
             <div className="field-group">
               <div className="field-label">
                 <i className="fas fa-map-marker-alt"></i> Localização{' '}
@@ -318,11 +346,13 @@ const PublicarServico = () => {
               <div className="hint-text">O cliente verá essa informação</div>
             </div>
           </div>
+
           <button type="submit" className="publish-btn">
             <i className="fas fa-paper-plane"></i> Publicar serviço
           </button>
         </form>
       </div>
+
       {toast && (
         <Toast
           message={toast.message}
@@ -330,6 +360,7 @@ const PublicarServico = () => {
           onClose={() => setToast(null)}
         />
       )}
+
       <link
         rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"

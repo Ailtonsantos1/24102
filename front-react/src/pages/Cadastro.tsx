@@ -1,8 +1,7 @@
-// @ts-nocheck
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cadastrarUser } from '../services/api';
+import { Errors, Toast } from '../lib/types';
 
 export default function Cadastro() {
   const navigate = useNavigate();
@@ -11,8 +10,8 @@ export default function Cadastro() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [userType, setUserType] = useState('');
-  const [errors, setErrors] = useState({});
-  const [toast, setToast] = useState(null);
+  const [errors, setErrors] = useState<Errors>({});
+  const [toast, setToast] = useState<Toast>(null);
 
   const validateName = () => {
     if (!fullName.trim()) return 'Nome completo é obrigatório.';
@@ -98,6 +97,7 @@ export default function Cadastro() {
 
       setTimeout(() => setToast(null), 3000);
     } else {
+      //Replace with new Toast interface
       setToast({
         msg: 'Preencha todos os campos corretamente',
         isError: true,

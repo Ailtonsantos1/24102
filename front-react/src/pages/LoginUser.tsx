@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { loginUser } from '../services/api';
+import { ToastState } from '../lib/types';
 
 export default function LoginUser() {
   const navigate = useNavigate();
@@ -8,8 +9,8 @@ export default function LoginUser() {
   const [password, setPassword] = useState('');
   const [userType, setUserType] = useState('cliente');
   const [remember, setRemember] = useState(false);
-  const [errors, setErrors] = useState({});
-  const [toast, setToast] = useState(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [toast, setToast] = useState<ToastState | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('savedEmail');
@@ -21,11 +22,14 @@ export default function LoginUser() {
 
   const validate = () => {
     let newErrors = {};
-    if (!email.trim()) newErrors.email = 'E-mail obrigatório';
+    if (!email.trim())
+      (newErrors as Record<string, string>).email = 'E-mail obrigatório';
     else if (!/^[^\s@]+@([^\s@]+\.)+[^\s@]+$/.test(email))
-      newErrors.email = 'E-mail inválido';
-    if (!password) newErrors.password = 'Senha obrigatória';
-    else if (password.length < 6) newErrors.password = 'Mínimo 6 caracteres';
+      (newErrors as Record<string, string>).email = 'E-mail inválido';
+    if (!password)
+      (newErrors as Record<string, string>).password = 'Senha obrigatória';
+    else if (password.length < 6)
+      (newErrors as Record<string, string>).password = 'Mínimo 6 caracteres';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -51,7 +55,7 @@ export default function LoginUser() {
         }
 
         setToast({
-          msg: resposta.mensagem,
+          message: resposta.mensagem,
           isError: false,
         });
 
@@ -62,17 +66,19 @@ export default function LoginUser() {
         }, 1500);
       } else {
         setToast({
-          msg: resposta.erro || 'Login inválido',
+          message: resposta.erro || 'Login inválido',
           isError: true,
         });
       }
     } catch (error) {
       console.log(error);
 
-      setToast({
-        msg: 'Erro ao conectar ao servidor',
-        isError: true,
-      });
+      setTimeout(() => {
+        setToast({
+          message: 'Erro ao conectar ao servidor',
+          isError: true,
+        });
+      }, 1500);
     }
   };
 
@@ -151,7 +157,7 @@ export default function LoginUser() {
             onClick={(e) => {
               e.preventDefault();
               setToast({
-                msg: '🔐 Instruções enviadas para seu e-mail',
+                message: '🔐 Instruções enviadas para seu e-mail',
                 isError: false,
               });
             }}
@@ -170,7 +176,7 @@ export default function LoginUser() {
         <button
           className="google-btn"
           onClick={() =>
-            setToast({ msg: 'Login com Google em breve', isError: false })
+            setToast({ message: 'Login com Google em breve', isError: false })
           }
         >
           <i className="fab fa-google"></i> Continuar com Google
@@ -196,7 +202,7 @@ export default function LoginUser() {
           <i
             className={`fas ${toast.isError ? 'fa-exclamation-triangle' : 'fa-check-circle'}`}
           ></i>{' '}
-          {toast.msg}
+          {toast.message}
         </div>
       )}
     </div>

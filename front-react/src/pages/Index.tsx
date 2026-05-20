@@ -1,12 +1,12 @@
-// @ts-nocheck
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Toast } from '../components/Toast';
+import { ToastState } from '../lib/types';
 
 export default function Index() {
   const navigate = useNavigate();
-  const [toast, setToast] = useState(null);
-  const showToast = (msg, err = false) =>
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const showToast = (msg: string, err = false) =>
     setToast({ message: msg, isError: err });
   return (
     <div className="container">

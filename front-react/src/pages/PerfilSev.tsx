@@ -668,7 +668,7 @@ textarea {
               <div className="section-title">Descrição (bio)</div>
               <div className="field-group">
                 <textarea
-                  rows="3"
+                  rows={3}
                   placeholder="Conte um pouco sobre você..."
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
@@ -685,7 +685,7 @@ textarea {
               </div>
               <div className="field-group">
                 <textarea
-                  rows="3"
+                  rows={3}
                   placeholder="Descreva sua experiência..."
                   value={experiencia}
                   onChange={(e) => setExperiencia(e.target.value)}

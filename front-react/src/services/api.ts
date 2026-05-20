@@ -1,15 +1,19 @@
+import { RegisterData, LoginData } from '../lib/types';
+
 const API_URL = 'http://localhost:3000';
 
 const getAuthHeader = (): Record<string, string> => {
   const token = localStorage.getItem('token');
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
   return headers;
 };
 
-export async function cadastrarUser(data: unknown) {
+export async function cadastrarUser(data: RegisterData) {
   const res = await fetch(`${API_URL}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -19,7 +23,7 @@ export async function cadastrarUser(data: unknown) {
   return res.json();
 }
 
-export async function loginUser(data: unknown) {
+export async function loginUser(data: LoginData) {
   const res = await fetch(`${API_URL}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -29,12 +33,17 @@ export async function loginUser(data: unknown) {
   return res.json();
 }
 
-export async function listarProfissionais(filters: Record<string, string> = {}) {
+export async function listarProfissionais(
+  filters: Record<string, string> = {}
+) {
   const params = new URLSearchParams(filters).toString();
-  const res = await fetch(`${API_URL}/professionals${params ? `?${params}` : ''}`, {
-    method: 'GET',
-    headers: getAuthHeader(),
-  });
+  const res = await fetch(
+    `${API_URL}/professionals${params ? `?${params}` : ''}`,
+    {
+      method: 'GET',
+      headers: getAuthHeader(),
+    }
+  );
   return res.json();
 }
 
@@ -46,7 +55,7 @@ export async function obterProfissionalPorId(id: number | string) {
   return res.json();
 }
 
-export async function criarPerfilProfissional(data: unknown) {
+export async function criarPerfilProfissional(data: Record<string, unknown>) {
   const res = await fetch(`${API_URL}/professionals/profile`, {
     method: 'POST',
     headers: getAuthHeader(),
@@ -55,7 +64,9 @@ export async function criarPerfilProfissional(data: unknown) {
   return res.json();
 }
 
-export async function atualizarPerfilProfissional(data: unknown) {
+export async function atualizarPerfilProfissional(
+  data: Record<string, unknown>
+) {
   const res = await fetch(`${API_URL}/professionals/profile`, {
     method: 'PUT',
     headers: getAuthHeader(),
@@ -64,7 +75,7 @@ export async function atualizarPerfilProfissional(data: unknown) {
   return res.json();
 }
 
-export async function adicionarServico(data: unknown) {
+export async function adicionarServico(data: Record<string, unknown>) {
   const res = await fetch(`${API_URL}/professionals/services`, {
     method: 'POST',
     headers: getAuthHeader(),
@@ -81,7 +92,7 @@ export async function removerServico(id: number | string) {
   return res.json();
 }
 
-export async function criarProposta(data: unknown) {
+export async function criarProposta(data: Record<string, unknown>) {
   const res = await fetch(`${API_URL}/proposals`, {
     method: 'POST',
     headers: getAuthHeader(),
@@ -106,7 +117,10 @@ export async function obterPropostaPorId(id: number | string) {
   return res.json();
 }
 
-export async function enviarPropostaParaProfissionais(id: number | string, professionals: unknown[]) {
+export async function enviarPropostaParaProfissionais(
+  id: number | string,
+  professionals: unknown[]
+) {
   const res = await fetch(`${API_URL}/proposals/${id}/send`, {
     method: 'POST',
     headers: getAuthHeader(),
@@ -115,11 +129,17 @@ export async function enviarPropostaParaProfissionais(id: number | string, profe
   return res.json();
 }
 
-export async function iniciarServico(propostaId: number | string, professionalId: number | string) {
-  const res = await fetch(`${API_URL}/proposals/${propostaId}/start/${professionalId}`, {
-    method: 'PATCH',
-    headers: getAuthHeader(),
-  });
+export async function iniciarServico(
+  propostaId: number | string,
+  professionalId: number | string
+) {
+  const res = await fetch(
+    `${API_URL}/proposals/${propostaId}/start/${professionalId}`,
+    {
+      method: 'PATCH',
+      headers: getAuthHeader(),
+    }
+  );
   return res.json();
 }
 
@@ -147,7 +167,7 @@ export async function recusarProposta(id: number | string) {
   return res.json();
 }
 
-export async function criarAvaliacao(data: unknown) {
+export async function criarAvaliacao(data: Record<string, unknown>) {
   const res = await fetch(`${API_URL}/ratings`, {
     method: 'POST',
     headers: getAuthHeader(),
@@ -163,4 +183,3 @@ export async function listarAvaliacoesPorProfissional(id: number | string) {
   });
   return res.json();
 }
-

@@ -109,7 +109,8 @@ const PerfilCliente = () => {
     reader.onload = (e) => {
       const imageData = e.target.result;
       setAvatar(imageData);
-      localStorage.setItem('userAvatar', imageData);
+
+      localStorage.setItem('userAvatar', imageData as string);
       showToast('✅ Foto de perfil atualizada!');
       closePhotoModal();
     };
