@@ -20,8 +20,8 @@ interface Usuario {
 interface AuthContextType {
   usuario: Usuario | null;
   loading: boolean;
-  login: (email: string, senha: string) => Promise<void>;
-  cadastrar: (data: any) => Promise<void>;
+  login: (email: string, senha: string) => Promise<Usuario>;
+  cadastrar: (data: any) => Promise<Usuario>;
   logout: () => Promise<void>;
 }
 
@@ -49,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, senha: string) => {
     const resposta = await loginUser({ email, senha });
+    if (!resposta.usuario) throw new Error('Resposta inválida do servidor');
     setUsuario(resposta.usuario);
     return resposta.usuario;
   };

@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { listarMinhasPropostas } from '../../services/api';
+import { listarMinhasPropostasProfissional } from '../../services/api';
 
 const Home = () => {
   const navigate = useNavigate();
-  const { usuario } = useAuth();
+  const { usuario, logout } = useAuth();
   const [servicosDisponiveis, setServicosDisponiveis] = useState([]);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
@@ -21,9 +21,9 @@ const Home = () => {
   useEffect(() => {
     const carregarDados = async () => {
       try {
-        const dados = await listarMinhasPropostas();
-        if (dados.propostas) {
-          setServicosDisponiveis(dados.propostas);
+        const dados = await listarMinhasPropostasProfissional();
+        if (Array.isArray(dados)) {
+          setServicosDisponiveis(dados);
         }
       } catch (error) {
         console.error(error);
@@ -32,8 +32,8 @@ const Home = () => {
     carregarDados();
   }, []);
 
-  const userName = usuario?.nome || 'João Silva';
-  const location = 'Brasília - DF';
+  const userName = usuario?.nome || 'Profissional';
+  const [location, setLocation] = useState('Brasília - DF');
 
   const handleCardClick = (servico) => {
     navigate(`/professional/service-details/${servico.id}`, {
@@ -44,9 +44,9 @@ const Home = () => {
     const newLocation = prompt('Digite sua cidade e UF:', location);
     if (newLocation) setLocation(newLocation);
   };
-  const handleLogout = () => {
-    showToastMessage('🔐 Logout realizado!');
-    setTimeout(() => navigate('/'), 800);
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
   };
 
   const styles = `

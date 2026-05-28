@@ -6,12 +6,21 @@ export type UserType = 'CLIENTE' | 'PROFISSIONAL';
 
 export type ProposalStatus =
   | 'PENDENTE'
-  | 'ABERTA'
+  | 'ACEITA'
+  | 'RECUSADA'
+  | 'CANCELADA'
   | 'EM_ANDAMENTO'
-  | 'CONCLUIDA'
-  | 'CANCELADA';
+  | 'FINALIZADA'
+  | 'AVALIADA';
 
-export type ProposalProfessionalStatus = 'PENDENTE' | 'ACEITA' | 'REJEITADA';
+export type ProposalProfessionalStatus =
+  | 'PENDENTE'
+  | 'ACEITA'
+  | 'RECUSADA'
+  | 'CANCELADA'
+  | 'EM_ANDAMENTO'
+  | 'FINALIZADA'
+  | 'AVALIADA';
 
 export type ServicoStatus = 'aberto' | 'fechado' | 'andamento';
 

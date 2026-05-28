@@ -42,13 +42,10 @@ export default function LoginUser() {
       }, 1000);
     } catch (error) {
       console.log(error);
-
-      setTimeout(() => {
-        setToast({
-          message: 'Erro ao conectar ao servidor',
-          isError: true,
-        });
-      }, 1500);
+      setToast({
+        message: error instanceof Error ? error.message : 'Erro ao conectar ao servidor',
+        isError: true,
+      });
     }
   };
 

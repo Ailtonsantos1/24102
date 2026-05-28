@@ -19,7 +19,8 @@ export class ProposalClientController {
         .json({ erro: 'Apenas clientes podem criar propostas' })
     }
 
-    const { titulo, descricao, valor, prazo } = req.body
+    const { titulo, descricao, prazo } = req.body
+    const valor = req.body.valor ?? req.body.preco ?? null
 
     try {
       const [proposta] = await db
@@ -55,7 +56,7 @@ export class ProposalClientController {
           .where(eq(proposals.client_id, user.userId))
           .orderBy(desc(proposals.created_at))
 
-        res.json(propostas)
+        res.json({ propostas })
       }
     } catch (error) {
       console.error(error)
@@ -114,6 +115,82 @@ export class ProposalClientController {
         cliente,
         profissionais,
       })
+    } catch (error) {
+      console.error(error)
+      res.status(500).json({ erro: 'Erro interno do servidor' })
+    }
+  }
+
+  static async deletar(req: Request, res: Response) {
+    const user = req.user!
+    const { id } = req.params
+
+    try {
+      const [proposta] = await db
+        .select()
+        .from(proposals)
+        .where(eq(proposals.id, Number(id)))
+
+      if (!proposta) {
+        return res.status(404).json({ erro: 'Proposta não encontrada' })
+      }
+
+      if (proposta.client_id !== user.userId) {
+        return res.status(403).json({ erro: 'Acesso negado' })
+      }
+
+      const podeExcluir = proposta.status === 'PENDENTE' || proposta.status === 'FINALIZADA'
+      if (!podeExcluir) {
+        return res.status(400).json({ erro: 'Só é possível excluir pedidos pendentes ou finalizados' })
+      }
+
+      await db.delete(proposals).where(eq(proposals.id, Number(id)))
+
+      res.json({ mensagem: 'Proposta excluída com sucesso' })
+    } catch (error) {
+      console.error(error)
+      res.status(500).json({ erro: 'Erro interno do servidor' })
+    }
+  }
+
+  static async atualizar(req: Request, res: Response) {
+    const user = req.user!
+    const { id } = req.params
+    const { titulo, descricao, prazo } = req.body
+    const valor = req.body.valor ?? req.body.preco ?? undefined
+
+    try {
+      const [proposta] = await db
+        .select()
+        .from(proposals)
+        .where(eq(proposals.id, Number(id)))
+
+      if (!proposta) {
+        return res.status(404).json({ erro: 'Proposta não encontrada' })
+      }
+
+      if (proposta.client_id !== user.userId) {
+        return res.status(403).json({ erro: 'Acesso negado' })
+      }
+
+      if (proposta.status !== 'PENDENTE') {
+        return res.status(400).json({ erro: 'Apenas propostas pendentes podem ser editadas' })
+      }
+
+      const campos: Record<string, unknown> = {}
+      if (titulo !== undefined) campos.titulo = titulo
+      if (descricao !== undefined) campos.descricao = descricao
+      if (valor !== undefined) campos.valor = valor
+      if (prazo !== undefined) campos.prazo = prazo
+
+      await db.update(proposals).set(campos).where(eq(proposals.id, Number(id)))
+
+      const [atualizada] = await db
+        .select()
+        .from(proposals)
+        .where(eq(proposals.id, Number(id)))
+
+      res.json({ mensagem: 'Proposta atualizada com sucesso', proposta: atualizada })
     } catch (error) {
       console.error(error)
       res.status(500).json({ erro: 'Erro interno do servidor' })

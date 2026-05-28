@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Errors, Toast } from '../lib/types';
+import { FormErrors, Toast } from '../lib/types';
 
 export default function Cadastro() {
   const navigate = useNavigate();
@@ -10,10 +10,8 @@ export default function Cadastro() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [userType, setUserType] = useState('');
-  const [errors, setErrors] = useState<Errors>({});
-  const [toast, setToast] = useState<Toast>(null);
-
-  useEffect(() => {}, []);
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [toast, setToast] = useState<Toast | null>(null);
 
   const validateName = () => {
     if (!fullName.trim()) return 'Nome completo é obrigatório.';
@@ -63,7 +61,7 @@ export default function Cadastro() {
           nome: fullName,
           email,
           senha: password,
-          tipo: userType === 'CLIENTE' ? 'CLIENTE' : 'PROFISSIONAL',
+          tipo: userType as 'CLIENTE' | 'PROFISSIONAL',
         });
 
         setToast({
@@ -174,13 +172,13 @@ export default function Cadastro() {
 
           <div className="radio-options">
             <div
-              className={`radio-card ${userType === 'Cliente' ? 'selected' : ''}`}
-              onClick={() => setUserType('Cliente')}
+              className={`radio-card ${userType === 'CLIENTE' ? 'selected' : ''}`}
+              onClick={() => setUserType('CLIENTE')}
             >
               <input
                 type="radio"
                 name="userType"
-                checked={userType === 'Cliente'}
+                checked={userType === 'CLIENTE'}
                 readOnly
               />
 
@@ -188,13 +186,13 @@ export default function Cadastro() {
             </div>
 
             <div
-              className={`radio-card ${userType === 'Prestador de serviços' ? 'selected' : ''}`}
-              onClick={() => setUserType('Prestador de serviços')}
+              className={`radio-card ${userType === 'PROFISSIONAL' ? 'selected' : ''}`}
+              onClick={() => setUserType('PROFISSIONAL')}
             >
               <input
                 type="radio"
                 name="userType"
-                checked={userType === 'Prestador de serviços'}
+                checked={userType === 'PROFISSIONAL'}
                 readOnly
               />
 
@@ -212,13 +210,7 @@ export default function Cadastro() {
         <div className="action-buttons">
           <button
             className="btn btn-outline"
-            onClick={() => {
-              setFullName('');
-              setEmail('');
-              setPassword('');
-              setUserType('');
-              setErrors({});
-            }}
+            onClick={() => navigate('/')}
           >
             Cancelar
           </button>

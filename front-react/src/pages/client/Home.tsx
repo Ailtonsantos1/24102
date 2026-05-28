@@ -5,7 +5,7 @@ import { listarProfissionais } from '../../services/api';
 
 const Home = () => {
   const navigate = useNavigate();
-  const { usuario } = useAuth();
+  const { usuario, logout } = useAuth();
   const [prestadores, setPrestadores] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedProfessional, setSelectedProfessional] = useState(null);
@@ -171,7 +171,7 @@ const Home = () => {
             </button>
             <button
               className="icon-btn"
-              onClick={() => navigate('/')}
+              onClick={async () => { await logout(); navigate('/login'); }}
               title="Sair"
             >
               <i className="fas fa-sign-out-alt"></i>

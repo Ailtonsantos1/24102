@@ -7,6 +7,7 @@ import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 
 const JWT_SECRET = process.env.JWT_SECRET
+if (!JWT_SECRET) throw new Error('JWT_SECRET não definido no .env')
 
 export class AuthController {
   static async register(req: Request, res: Response) {
@@ -131,7 +132,10 @@ export class AuthController {
       res.json(response)
     } catch (error) {
       console.error('❌ Erro no login:', error)
-      res.status(500).json({ erro: 'Erro interno do servidor' })
+      res.status(500).json({
+        erro: 'Erro interno do servidor',
+        detalhes: error instanceof Error ? error.message : String(error),
+      })
     }
   }
 
