@@ -21,7 +21,8 @@ export async function loginCliente(data: LoginData) {
     body: JSON.stringify(data),
   });
   const json = await res.json();
-  if (!res.ok) throw new Error(json.detalhes ?? json.erro ?? 'Erro ao fazer login');
+  if (!res.ok)
+    throw new Error(json.detalhes ?? json.erro ?? 'Erro ao fazer login');
   return json;
 }
 
@@ -63,7 +64,8 @@ export async function loginProfissional(data: LoginData) {
     body: JSON.stringify(data),
   });
   const json = await res.json();
-  if (!res.ok) throw new Error(json.detalhes ?? json.erro ?? 'Erro ao fazer login');
+  if (!res.ok)
+    throw new Error(json.detalhes ?? json.erro ?? 'Erro ao fazer login');
   return json;
 }
 
@@ -88,9 +90,10 @@ export async function atualizarProfissional(data: Record<string, unknown>) {
 
 // Legacy functions (backward compatibility)
 export async function cadastrarUser(data: RegisterData) {
-  const endpoint = data.tipo === 'CLIENTE' 
-    ? '/client/auth/register' 
-    : '/professional/auth/register';
+  const endpoint =
+    data.tipo === 'CLIENTE'
+      ? '/client/auth/register'
+      : '/professional/auth/register';
   const res = await fetch(`${API_URL}${endpoint}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -108,7 +111,8 @@ export async function loginUser(data: LoginData) {
     body: JSON.stringify(data),
   });
   const json = await res.json();
-  if (!res.ok) throw new Error(json.detalhes ?? json.erro ?? 'Erro ao fazer login');
+  if (!res.ok)
+    throw new Error(json.detalhes ?? json.erro ?? 'Erro ao fazer login');
   return json;
 }
 
@@ -220,6 +224,36 @@ export async function listarTodosServicos() {
   return res.json();
 }
 
+export async function listarPropostasRecebidas() {
+  const res = await fetch(`${API_URL}/client/proposals/received`, {
+    method: 'GET',
+    credentials: 'include',
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.erro ?? 'Erro ao listar propostas');
+  return json;
+}
+
+export async function aceitarPropostaCliente(id: number | string) {
+  const res = await fetch(`${API_URL}/client/proposals/${id}/accept`, {
+    method: 'PATCH',
+    credentials: 'include',
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.erro ?? 'Erro ao aceitar proposta');
+  return json;
+}
+
+export async function recusarPropostaCliente(id: number | string) {
+  const res = await fetch(`${API_URL}/client/proposals/${id}/reject`, {
+    method: 'PATCH',
+    credentials: 'include',
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.erro ?? 'Erro ao recusar proposta');
+  return json;
+}
+
 // Propostas antigas
 export async function criarProposta(data: Record<string, unknown>) {
   const res = await fetch(`${API_URL}/client/proposals`, {
@@ -243,7 +277,10 @@ export async function deletarProposta(id: number | string) {
   return json;
 }
 
-export async function atualizarProposta(id: number | string, data: Record<string, unknown>) {
+export async function atualizarProposta(
+  id: number | string,
+  data: Record<string, unknown>
+) {
   const res = await fetch(`${API_URL}/client/proposals/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -319,20 +356,24 @@ export async function enviarProposta(data: Record<string, unknown>) {
   return json;
 }
 
-export async function aceitarProposta(id: number | string) {
+export async function aceitarPropostaProfissional(id: number | string) {
   const res = await fetch(`${API_URL}/professionals/proposals/${id}/accept`, {
     method: 'POST',
     credentials: 'include',
   });
-  return res.json();
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.erro ?? 'Erro ao aceitar proposta');
+  return json;
 }
 
-export async function recusarProposta(id: number | string) {
+export async function recusarPropostaProfissional(id: number | string) {
   const res = await fetch(`${API_URL}/professionals/proposals/${id}/reject`, {
     method: 'POST',
     credentials: 'include',
   });
-  return res.json();
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.erro ?? 'Erro ao recusar proposta');
+  return json;
 }
 
 export async function listarMinhasPropostasProfissional() {
@@ -340,19 +381,19 @@ export async function listarMinhasPropostasProfissional() {
     method: 'GET',
     credentials: 'include',
   });
-  return res.json();
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.erro ?? 'Erro ao listar propostas');
+  return json;
 }
 
-export async function marcarServicoComoConcluido(proposalProfessionalId: number | string) {
-  const res = await fetch(
-    `${API_URL}/professionals/proposals/${proposalProfessionalId}/complete`,
-    {
-      method: 'POST',
-      credentials: 'include',
-    }
-  );
+export async function marcarServicoComoConcluido(id: number | string) {
+  const res = await fetch(`${API_URL}/professionals/proposals/${id}/complete`, {
+    method: 'POST',
+    credentials: 'include',
+  });
   const json = await res.json();
-  if (!res.ok) throw new Error(json.erro ?? 'Erro ao marcar serviço como concluído');
+  if (!res.ok)
+    throw new Error(json.erro ?? 'Erro ao marcar serviço como concluído');
   return json;
 }
 
@@ -393,7 +434,7 @@ export async function uploadSingleImage(file: File) {
   const res = await fetch(`${API_URL}/api/upload/single`, {
     method: 'POST',
     credentials: 'include',
-    body: formData
+    body: formData,
   });
 
   const json = await res.json();
@@ -403,15 +444,16 @@ export async function uploadSingleImage(file: File) {
 
 export async function uploadMultipleImages(files: File[]) {
   const formData = new FormData();
-  files.forEach(file => formData.append('images', file));
+  files.forEach((file) => formData.append('images', file));
 
   const res = await fetch(`${API_URL}/api/upload/multiple`, {
     method: 'POST',
     credentials: 'include',
-    body: formData
+    body: formData,
   });
 
   const json = await res.json();
-  if (!res.ok) throw new Error(json.error ?? 'Erro ao fazer upload das imagens');
+  if (!res.ok)
+    throw new Error(json.error ?? 'Erro ao fazer upload das imagens');
   return json;
 }

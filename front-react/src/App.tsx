@@ -8,6 +8,7 @@ import ClientHome from './pages/client/Home';
 import ClientServices from './pages/client/Services';
 import ClientProposals from './pages/client/Proposals';
 import ClientProfile from './pages/client/Profile';
+import ClientPostService from './pages/client/PostService';
 import LoginClient from './pages/client/LoginClient';
 import CadastroClient from './pages/client/CadastroClient';
 import ProfessionalHome from './pages/professional/Home';
@@ -41,6 +42,14 @@ function App() {
           element={
             <ProtectedRoute allowedType="CLIENTE">
               <ClientServices />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/client/post-service"
+          element={
+            <ProtectedRoute allowedType="CLIENTE">
+              <ClientPostService />
             </ProtectedRoute>
           }
         />

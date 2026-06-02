@@ -42,15 +42,32 @@ export const professionalProfiles = sqliteTable("professional_profiles", {
 
 export const professionalServices = sqliteTable("professional_services", {
   id: int("id").primaryKey({ autoIncrement: true }),
-  professional_profile_id: int("professional_profile_id")
+  client_id: int("client_id")
     .notNull()
-    .references(() => professionalProfiles.id, { onDelete: "cascade" }),
-  categoria: text("categoria").notNull(),
-  subcategoria: text("subcategoria"),
+    .references(() => users.id, { onDelete: "cascade" }),
+  titulo: text("titulo").notNull(),
+  descricao: text("descricao"),
+  categoria: text("categoria"),
+  preco: real("preco"),
   urgente: int("urgente").default(0),
   contato: text("contato"),
   localizacao: text("localizacao"),
   fotos: text("fotos"), // array de URLs em JSON
+  status: text("status")
+    .notNull()
+    .$type<
+      | "PENDENTE"
+      | "ACEITA"
+      | "RECUSADA"
+      | "CANCELADA"
+      | "EM_ANDAMENTO"
+      | "FINALIZADA"
+      | "AVALIADA"
+    >()
+    .default("PENDENTE"),
+  created_at: int("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
 });
 
 export const proposals = sqliteTable("proposals", {
@@ -60,8 +77,13 @@ export const proposals = sqliteTable("proposals", {
     .references(() => users.id, { onDelete: "cascade" }),
   titulo: text("titulo").notNull(),
   descricao: text("descricao"),
+  categoria: text("categoria"),
   valor: real("valor"),
   prazo: text("prazo"),
+  urgente: int("urgente").default(0),
+  contato: text("contato"),
+  localizacao: text("localizacao"),
+  fotos: text("fotos"), // array de URLs em JSON
   status: text("status")
     .notNull()
     .$type<
@@ -81,12 +103,15 @@ export const proposals = sqliteTable("proposals", {
 
 export const proposalProfessionals = sqliteTable("proposal_professionals", {
   id: int("id").primaryKey({ autoIncrement: true }),
-  proposal_id: int("proposal_id")
+  service_id: int("service_id")
     .notNull()
-    .references(() => proposals.id, { onDelete: "cascade" }),
+    .references(() => professionalServices.id, { onDelete: "cascade" }),
   professional_id: int("professional_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
+  mensagem: text("mensagem"),
+  valor: real("valor"),
+  negociavel: int("negociavel").default(0),
   status: text("status")
     .notNull()
     .$type<
@@ -99,6 +124,9 @@ export const proposalProfessionals = sqliteTable("proposal_professionals", {
       | "AVALIADA"
     >()
     .default("PENDENTE"),
+  created_at: int("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
 });
 
 export const ratings = sqliteTable("ratings", {
@@ -124,7 +152,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     fields: [users.id],
     references: [professionalProfiles.user_id],
   }),
-  clientProposals: many(proposals),
+  clientServices: many(professionalServices),
   sentProposalProfessionals: many(proposalProfessionals, {
     relationName: "professional",
   }),
@@ -139,17 +167,17 @@ export const professionalProfilesRelations = relations(
       fields: [professionalProfiles.user_id],
       references: [users.id],
     }),
-    services: many(professionalServices),
   }),
 );
 
 export const professionalServicesRelations = relations(
   professionalServices,
-  ({ one }) => ({
-    profile: one(professionalProfiles, {
-      fields: [professionalServices.professional_profile_id],
-      references: [professionalProfiles.id],
+  ({ one, many }) => ({
+    client: one(users, {
+      fields: [professionalServices.client_id],
+      references: [users.id],
     }),
+    proposalProfessionals: many(proposalProfessionals),
   }),
 );
 
@@ -158,15 +186,14 @@ export const proposalsRelations = relations(proposals, ({ one, many }) => ({
     fields: [proposals.client_id],
     references: [users.id],
   }),
-  proposalProfessionals: many(proposalProfessionals),
 }));
 
 export const proposalProfessionalsRelations = relations(
   proposalProfessionals,
   ({ one, many }) => ({
-    proposal: one(proposals, {
-      fields: [proposalProfessionals.proposal_id],
-      references: [proposals.id],
+    service: one(professionalServices, {
+      fields: [proposalProfessionals.service_id],
+      references: [professionalServices.id],
     }),
     professional: one(users, {
       fields: [proposalProfessionals.professional_id],

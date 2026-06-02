@@ -7,7 +7,7 @@ import { authenticateToken } from "../../middleware/authMiddleware.js";
 const router = Router();
 
 router.get("/", ProfessionalController.listar);
-router.get("/:id", ProfessionalController.obterPorId);
+// Routes with static segments first!
 router.post("/profile", authenticateToken, ProfessionalController.criarPerfil);
 router.put(
   "/profile",
@@ -43,5 +43,7 @@ router.post(
   ProposalController.marcarConcluido,
 );
 router.get("/proposals", authenticateToken, ProposalController.listarMinhas);
+// Dynamic route last!
+router.get("/:id", ProfessionalController.obterPorId);
 
 export default router;

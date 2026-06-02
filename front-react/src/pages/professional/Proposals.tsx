@@ -14,28 +14,11 @@ type FiltroProposta =
   | 'FINALIZADA'
   | 'EM_ANDAMENTO';
 
-interface PropostaApi {
-  id: number;
-  client_id: number;
-  titulo: string;
-  descricao: string;
-  valor: number;
-  prazo: string;
-  status: string;
-  created_at: string;
-  proposalProfessional: {
-    id: number;
-    proposal_id: number;
-    professional_id: number;
-    status: 'PENDENTE' | 'ACEITA' | 'RECUSADA' | 'FINALIZADA' | 'EM_ANDAMENTO';
-  };
-}
-
 const Proposals: React.FC = () => {
   const navigate = useNavigate();
   const { usuario, logout } = useAuth();
 
-  const [propostas, setPropostas] = useState<PropostaApi[]>([]);
+  const [propostas, setPropostas] = useState<any[]>([]);
   const [currentFilter, setCurrentFilter] = useState<FiltroProposta>('all');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastType, setToastType] = useState<'success' | 'error' | 'normal'>(
@@ -47,60 +30,78 @@ const Proposals: React.FC = () => {
     try {
       setLoading(true);
       const dados = await listarMinhasPropostasProfissional();
-      setPropostas(dados);
+      setPropostas(dados.propostas || []);
     } catch (error) {
       console.error(error);
-      setToastMessage('Erro ao carregar propostas');
+      const mensagem = error instanceof Error ? error.message : 'Erro ao carregar propostas!';
+      setToastMessage(mensagem);
       setToastType('error');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleMarcarConcluido = async (proposalProfessionalId: number) => {
+  const handleMarcarConcluido = async (propostaId: number) => {
     try {
-      await marcarServicoComoConcluido(proposalProfessionalId);
+      await marcarServicoComoConcluido(propostaId);
       setToastMessage('✅ Serviço marcado como concluído!');
       setToastType('success');
       await loadPropostas();
     } catch (error) {
       console.error(error);
-      setToastMessage('Erro ao marcar serviço como concluído');
+      const mensagem = error instanceof Error ? error.message : 'Erro ao marcar serviço como concluído!';
+      setToastMessage(mensagem);
       setToastType('error');
     }
   };
 
   const filteredPropostas = propostas.filter((proposta) => {
     if (currentFilter === 'all') return true;
-    return proposta.proposalProfessional.status === currentFilter;
+    return proposta.status === currentFilter;
   });
 
-  const escapeHtml = (str: string): string => {
-    if (!str) return '';
-    return str.replace(/[&<>]/g, (m) => {
-      if (m === '&') return '&amp;';
-      if (m === '<') return '<';
-      if (m === '>') return '>';
-      return m;
-    });
+  const formatarValor = (valor: number | null) => {
+    if (!valor) return 'A negociar';
+    return `R$ ${Number(valor).toFixed(2)}`;
+  };
+
+  const getStatusStyle = (status: string) => {
+    switch (status) {
+      case 'PENDENTE':
+        return { bg: '#fff3e0', color: '#c96f0e', text: '⏳ Aguardando' };
+      case 'ACEITA':
+      case 'EM_ANDAMENTO':
+        return { bg: '#dcfce7', color: '#16a34a', text: '✅ Em andamento' };
+      case 'RECUSADA':
+        return { bg: '#fee2e2', color: '#dc2626', text: '❌ Recusada' };
+      case 'FINALIZADA':
+        return { bg: '#dbeafe', color: '#2563eb', text: '✅ Concluída' };
+      default:
+        return { bg: '#f3f4f6', color: '#64748b', text: status };
+    }
   };
 
   const renderPropostas = (): React.ReactNode => {
     if (loading) {
       return (
-        <div className="empty-state" id="emptyState">
+        <div className="empty-state">
           <span>⏳</span>
-          <p style={{ marginTop: '12px' }}>Carregando propostas...</p>
+          <p style={{ marginTop: '12px', fontSize: '1.1rem' }}>
+            Carregando suas propostas...
+          </p>
         </div>
       );
     }
 
     if (filteredPropostas.length === 0) {
       return (
-        <div className="empty-state" id="emptyState">
+        <div className="empty-state">
           <span>📭</span>
-          <p style={{ marginTop: '12px' }}>
-            Você ainda não tem nenhuma proposta.
+          <p style={{ marginTop: '12px', fontSize: '1.1rem' }}>
+            Você ainda não tem nenhuma proposta!
+          </p>
+          <p style={{ marginTop: '8px', color: '#9a3412' }}>
+            Volte para home e envie sua primeira proposta!
           </p>
         </div>
       );
@@ -109,38 +110,7 @@ const Proposals: React.FC = () => {
     return (
       <>
         {filteredPropostas.map((proposta) => {
-          let statusClass = '';
-          let statusText = '';
-          if (proposta.proposalProfessional.status === 'PENDENTE') {
-            statusClass = 'status-aguardando';
-            statusText = '⏳ Aguardando resposta';
-          } else if (
-            proposta.proposalProfessional.status === 'ACEITA' ||
-            proposta.proposalProfessional.status === 'EM_ANDAMENTO'
-          ) {
-            statusClass = 'status-aceita';
-            statusText = '✅ Em andamento';
-          } else if (proposta.proposalProfessional.status === 'RECUSADA') {
-            statusClass = 'status-recusada';
-            statusText = '❌ Recusada';
-          } else if (proposta.proposalProfessional.status === 'FINALIZADA') {
-            statusClass = 'status-aceita';
-            statusText = '✅ Concluída';
-          }
-
-          let valorDisplay = proposta.valor
-            ? `R$ ${proposta.valor.toFixed(2)}`
-            : 'Não informado';
-
-          const dataObj = new Date(proposta.created_at);
-          const dataFormatada =
-            dataObj.toLocaleDateString('pt-BR') +
-            ' às ' +
-            dataObj.toLocaleTimeString('pt-BR', {
-              hour: '2-digit',
-              minute: '2-digit',
-            });
-
+          const statusStyle = getStatusStyle(proposta.status);
           return (
             <div
               className="proposal-card"
@@ -149,79 +119,101 @@ const Proposals: React.FC = () => {
             >
               <div className="card-header">
                 <div className="client-info">
-                  <h3>{escapeHtml(proposta.titulo)}</h3>
+                  <h3>{proposta.servico?.titulo || 'Serviço'}</h3>
                   <div className="service-tag">
-                    🔧 {escapeHtml(proposta.descricao || 'Descrição')}
+                    👤 {proposta.cliente?.nome || 'Cliente'}
+                    {proposta.servico?.localizacao &&
+                      ` · 📍 ${proposta.servico.localizacao}`}
                   </div>
                 </div>
-                <div className={`status-badge ${statusClass}`}>
-                  {statusText}
+                <div
+                  className="status-badge"
+                  style={{
+                    background: statusStyle.bg,
+                    color: statusStyle.color,
+                  }}
+                >
+                  {statusStyle.text}
                 </div>
               </div>
               <div className="proposal-details">
-                <div className="proposal-message">
-                  <strong>💬 Descrição:</strong>
-                  <br />
-                  {escapeHtml(
-                    proposta.descricao.length > 150
-                      ? proposta.descricao.substring(0, 150) + '...'
-                      : proposta.descricao
-                  )}
-                </div>
+                {proposta.mensagem && (
+                  <div className="proposal-message">
+                    <strong>💬 Sua mensagem:</strong>
+                    <br />
+                    {proposta.mensagem.length > 160
+                      ? proposta.mensagem.substring(0, 160) + '...'
+                      : proposta.mensagem}
+                  </div>
+                )}
                 <div
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     flexWrap: 'wrap',
-                    gap: '8px',
-                    marginTop: '8px',
+                    gap: '10px',
+                    marginTop: '12px',
                   }}
                 >
-                  <span className="proposal-value">💰 {valorDisplay}</span>
+                  <span className="proposal-value">
+                    💰 {formatarValor(proposta.valor)}
+                    {proposta.negociavel === 1 && ' (negociável)'}
+                  </span>
                   <span
                     style={{
-                      fontSize: '0.7rem',
-                      background: '#f0f4fa',
-                      padding: '2px 12px',
+                      fontSize: '0.85rem',
+                      background: '#fff7ed',
+                      padding: '6px 14px',
                       borderRadius: '60px',
+                      color: '#9a3412',
+                      fontWeight: '600',
                     }}
                   >
-                    📅 {dataFormatada}
+                    📅{' '}
+                    {new Date(proposta.created_at).toLocaleDateString('pt-BR')}{' '}
+                    às{' '}
+                    {new Date(proposta.created_at).toLocaleTimeString('pt-BR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
                   </span>
                 </div>
               </div>
               <div className="proposal-date">
-                <span>📨 Proposta ID: {proposta.id}</span>
+                <span style={{ color: '#c2410c', fontWeight: '600' }}>
+                  📨 Proposta #{proposta.id}
+                </span>
                 <div
-                  style={{ display: 'flex', gap: '8px', alignItems: 'center' }}
+                  style={{ display: 'flex', gap: '10px', alignItems: 'center' }}
                 >
-                  {(proposta.proposalProfessional.status === 'ACEITA' ||
-                    proposta.proposalProfessional.status ===
-                      'EM_ANDAMENTO') && (
+                  {(proposta.status === 'ACEITA' ||
+                    proposta.status === 'EM_ANDAMENTO') && (
                     <button
                       style={{
-                        padding: '6px 16px',
-                        background: '#f97316',
+                        padding: '10px 22px',
+                        background: 'linear-gradient(135deg, #f97316, #ea580c)',
                         color: 'white',
                         border: 'none',
-                        borderRadius: '20px',
+                        borderRadius: '60px',
                         cursor: 'pointer',
-                        fontWeight: '600',
+                        fontWeight: '700',
+                        fontSize: '0.9rem',
+                        boxShadow: '0 4px 12px rgba(249,115,22,0.2)',
                       }}
-                      onClick={() =>
-                        handleMarcarConcluido(proposta.proposalProfessional.id)
+                      onClick={() => handleMarcarConcluido(proposta.id)}
+                      onMouseOver={(e) =>
+                        ((e.target as HTMLButtonElement).style.transform =
+                          'translateY(-1px)')
+                      }
+                      onMouseOut={(e) =>
+                        ((e.target as HTMLButtonElement).style.transform =
+                          'translateY(0)')
                       }
                     >
-                      ✅ Marcar como concluído
+                      ✅ Marcar como Concluído
                     </button>
                   )}
-                  <Link
-                    to={`/client/proposals/${proposta.id}`}
-                    className="detail-link"
-                  >
-                    Ver detalhes →
-                  </Link>
                 </div>
               </div>
             </div>
@@ -231,333 +223,45 @@ const Proposals: React.FC = () => {
     );
   };
 
-  const handleLogout = async (e: React.MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault();
-    if (window.confirm('Deseja realmente sair da sua conta?')) {
-      await logout();
-      setToastMessage('🔐 Logout realizado com sucesso!');
-      setToastType('success');
-      setTimeout(() => {
-        navigate('/');
-      }, 800);
-    }
-  };
-
   useEffect(() => {
     loadPropostas();
-
-    const timer = setTimeout(() => {
-      const total = propostas.length;
-      if (total > 0) {
-        setToastMessage(
-          `📬 Você tem ${total} proposta(s) no total. Use os filtros para organizar.`
-        );
-      } else {
-        setToastMessage(
-          'Envie sua primeira proposta clicando em "Tenho interesse" em algum serviço'
-        );
-      }
-    }, 400);
-
-    return () => {
-      clearTimeout(timer);
-    };
   }, []);
 
   const styles = `
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      background: linear-gradient(135deg, #f0f4fa 0%, #e0e8f2 100%);
-      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-      min-height: 100vh;
-      padding: 20px 20px 40px;
-      color: #1e2e3e;
-    }
-
-    .proposals-container {
-      max-width: 1000px;
-      margin: 0 auto;
-      background: #ffffff;
-      border-radius: 48px;
-      box-shadow: 0 25px 45px -12px rgba(0, 0, 0, 0.25);
-      overflow: hidden;
-    }
-
-    .page-header {
-      background: linear-gradient(115deg, #1f3b4c, #1c5a6b);
-      padding: 32px 36px 28px;
-      color: white;
-    }
-
-    .page-header h1 {
-      font-size: 2rem;
-      font-weight: 800;
-      letter-spacing: -0.3px;
-      margin-bottom: 16px;
-    }
-
-    .header-row {
-      display: flex;
-      align-items: center;
-      justify-content: flex-start;
-      gap: 20px;
-      flex-wrap: wrap;
-    }
-
-    .user-actions {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-
-    .icon-btn {
-      width: 45px;
-      height: 45px;
-      border: none;
-      border-radius: 12px;
-      background: rgba(255, 255, 255, 0.15);
-      color: white;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      text-decoration: none;
-      font-size: 18px;
-      transition: 0.3s;
-      cursor: pointer;
-    }
-
-    .icon-btn:hover {
-      background: #f97316;
-      color: white;
-      transform: translateY(-2px);
-    }
-
-    .page-header p {
-      opacity: 0.9;
-      font-weight: 500;
-      font-size: 0.9rem;
-      margin: 0;
-    }
-
-    .filters-bar {
-      padding: 24px 36px 0px 36px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      border-bottom: 1px solid #eef2f8;
-    }
-
-    .filter-btn {
-      background: transparent;
-      border: none;
-      padding: 10px 20px;
-      font-weight: 600;
-      font-size: 0.9rem;
-      border-radius: 40px;
-      cursor: pointer;
-      transition: all 0.2s;
-      color: #5f7d9c;
-    }
-
-    .filter-btn.active {
-      background: #1f3b4c;
-      color: white;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.05);
-    }
-
-    .filter-btn:hover:not(.active) {
-      background: #eef3fc;
-      color: #1f5e55;
-    }
-
-    .proposals-list {
-      padding: 28px 36px 32px;
-      min-height: 380px;
-    }
-
-    .proposal-card {
-      background: #ffffff;
-      border: 1px solid #ecf3f9;
-      border-radius: 32px;
-      padding: 24px;
-      margin-bottom: 20px;
-      transition: all 0.2s;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
-    }
-
-    .proposal-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 12px 20px -10px rgba(0, 0, 0, 0.1);
-      border-color: #d4e2f0;
-    }
-
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-
-    .client-info h3 {
-      font-size: 1.25rem;
-      font-weight: 800;
-      color: #1f3b4c;
-    }
-
-    .service-tag {
-      background: #eef3fc;
-      padding: 4px 14px;
-      border-radius: 40px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: #2c5a6e;
-      display: inline-block;
-      margin-top: 6px;
-    }
-
-    .status-badge {
-      padding: 6px 16px;
-      border-radius: 60px;
-      font-weight: 700;
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
-    }
-
-    .status-aguardando {
-      background: #fff3e0;
-      color: #c96f0e;
-    }
-
-    .status-aceita {
-      background: #e0f2e9;
-      color: #1f6e5c;
-    }
-
-    .status-recusada {
-      background: #ffe6e2;
-      color: #bc4e2c;
-    }
-
-    .proposal-details {
-      margin: 16px 0;
-      padding: 12px 0;
-      border-top: 1px dashed #eef2f8;
-      border-bottom: 1px dashed #eef2f8;
-    }
-
-    .proposal-message {
-      color: #3a5a72;
-      line-height: 1.45;
-      margin-bottom: 12px;
-      background: #fafcff;
-      padding: 12px 16px;
-      border-radius: 24px;
-      font-size: 0.9rem;
-    }
-
-    .proposal-value {
-      font-weight: 700;
-      color: #2c7a6e;
-      font-size: 1rem;
-      display: inline-block;
-      background: #ecfdf5;
-      padding: 4px 16px;
-      border-radius: 60px;
-    }
-
-    .proposal-date {
-      font-size: 0.7rem;
-      color: #8aa0bc;
-      margin-top: 12px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-
-    .detail-link {
-      color: #2c7a6e;
-      font-weight: 700;
-      text-decoration: none;
-      font-size: 0.85rem;
-      transition: 0.2s;
-    }
-
-    .detail-link:hover {
-      text-decoration: underline;
-      color: #f97316;
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 60px 20px;
-      color: #8ba0bc;
-    }
-
-    .empty-state span {
-      font-size: 3rem;
-      opacity: 0.6;
-    }
-
-    .success-toast {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      padding: 12px 20px;
-      border-radius: 40px;
-      color: white;
-      font-weight: 600;
-      z-index: 9999;
-      background: #f97316;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      animation: fadeInOut 3s ease forwards;
-    }
-
-    .toast-msg {
-      position: fixed;
-      bottom: 30px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #1f2e3a;
-      color: white;
-      padding: 12px 28px;
-      border-radius: 60px;
-      font-weight: 500;
-      z-index: 1100;
-      font-size: 0.85rem;
-      white-space: nowrap;
-    }
-
-    @keyframes fadeInOut {
-      0% { opacity: 0; transform: translateX(20px); }
-      15% { opacity: 1; transform: translateX(0); }
-      85% { opacity: 1; transform: translateX(0); }
-      100% { opacity: 0; transform: translateX(20px); visibility: hidden; }
-    }
-
-    @media (max-width: 680px) {
-      .page-header {
-        padding: 24px 24px 20px;
-      }
-      .header-row {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 12px;
-      }
-      .filters-bar {
-        padding: 20px 24px 0;
-      }
-      .proposals-list {
-        padding: 24px 24px 28px;
-      }
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+    body { background: #fff7ed; min-height: 100vh; }
+    .proposals-container { max-width: 1000px; margin: 0 auto; background: white; border-radius: 40px; box-shadow: 0 25px 45px -12px rgba(0, 0, 0, 0.12); overflow: hidden; margin-top: 32px; }
+    .page-header { background: linear-gradient(115deg, #f97316, #ea580c); padding: 32px 36px 26px; color: white; }
+    .page-header h1 { font-size: 2rem; font-weight: 800; letter-spacing: -0.3px; margin-bottom: 14px; display: flex; align-items: center; gap: 10px; }
+    .header-row { display: flex; align-items: center; justify-content: flex-start; gap: 20px; flex-wrap: wrap; }
+    .user-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+    .icon-btn { width: 44px; height: 44px; border: none; border-radius: 12px; background: rgba(255,255,255,0.18); color: white; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; transition: 0.2s; }
+    .icon-btn:hover { background: rgba(255,255,255,0.3); transform: translateY(-1px); }
+    .page-header p { opacity: 0.95; font-weight: 500; font-size: 0.95rem; }
+    .filters-bar { padding: 24px 36px 0; display: flex; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid #fed7aa; }
+    .filter-btn { background: transparent; border: none; padding: 10px 20px; font-weight: 700; font-size: 0.9rem; border-radius: 60px; cursor: pointer; transition: all 0.2s; color: #9a3412; }
+    .filter-btn.active { background: linear-gradient(135deg, #f97316, #ea580c); color: white; box-shadow: 0 4px 12px rgba(249,115,22,0.25); }
+    .filter-btn:hover:not(.active) { background: #fff7ed; color: #c2410c; }
+    .proposals-list { padding: 28px 36px 36px; min-height: 360px; }
+    .proposal-card { background: white; border: 1px solid #ffe4c2; border-radius: 28px; padding: 26px; margin-bottom: 20px; transition: all 0.25s; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03); }
+    .proposal-card:hover { transform: translateY(-3px); box-shadow: 0 12px 24px -10px rgba(249, 115, 22, 0.15); border-color: #fdba74; }
+    .card-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 14px; margin-bottom: 18px; }
+    .client-info h3 { font-size: 1.3rem; font-weight: 800; color: #7c2d12; }
+    .service-tag { background: #fff7ed; padding: 6px 14px; border-radius: 60px; font-size: 0.85rem; font-weight: 600; color: #c2410c; display: inline-block; margin-top: 8px; }
+    .status-badge { padding: 8px 18px; border-radius: 60px; font-weight: 800; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.4px; }
+    .proposal-details { margin: 18px 0; padding: 16px 0; border-top: 1px dashed #ffe4c2; border-bottom: 1px dashed #ffe4c2; }
+    .proposal-message { color: #7c2d12; line-height: 1.6; margin-bottom: 14px; background: #fffbeb; padding: 14px 18px; border-radius: 20px; font-size: 0.95rem; }
+    .proposal-value { font-weight: 800; color: #16a34a; font-size: 1.05rem; display: inline-block; background: #ecfdf5; padding: 6px 16px; border-radius: 60px; }
+    .proposal-date { font-size: 0.85rem; color: #c2410c; margin-top: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+    .empty-state { text-align: center; padding: 70px 20px; color: #9a3412; }
+    .empty-state span { font-size: 4rem; opacity: 0.7; display: block; margin-bottom: 10px; }
+    .success-toast { position: fixed; top: 24px; right: 24px; padding: 14px 24px; border-radius: 60px; color: white; font-weight: 700; z-index: 9999; background: linear-gradient(135deg, #f97316, #ea580c); box-shadow: 0 4px 14px rgba(249,115,22,0.25); animation: fadeInOut 3s ease forwards; }
+    .error-toast { background: #dc2626 !important; box-shadow: 0 4px 14px rgba(220,38,38,0.25) !important; }
+    @keyframes fadeInOut { 0% { opacity:0; transform: translateX(20px); } 15% { opacity:1; transform: translateX(0); } 85% { opacity:1; transform: translateX(0); } 100% { opacity:0; transform: translateX(20px); visibility: hidden; } }
+    @media (max-width: 700px) {
+      .page-header { padding: 24px 20px 18px; }
+      .filters-bar { padding: 20px 20px 0; }
+      .proposals-list { padding: 24px 20px 32px; }
     }
   `;
 
@@ -566,45 +270,50 @@ const Proposals: React.FC = () => {
       <style>{styles}</style>
       <div
         style={{
-          background: 'linear-gradient(135deg, #f0f4fa 0%, #e0e8f2 100%)',
-          fontFamily:
-            "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+          background: '#fff7ed',
           minHeight: '100vh',
-          padding: '20px 20px 40px',
-          color: '#1e2e3e',
+          paddingBottom: '40px',
         }}
       >
         <div className="proposals-container">
           <div className="page-header">
-            <h1>📋 Propostas</h1>
+            <h1>
+              <i className="fas fa-file-contract"></i> Minhas Propostas
+            </h1>
             <div className="header-row">
               <div className="user-actions">
-                <Link to="/professional/home" className="icon-btn" title="Home">
-                  <i className="fas fa-home"></i>
-                </Link>
                 <Link
-                  to="/professional/proposals"
+                  to="/professional/home"
                   className="icon-btn"
-                  title="Todas as propostas"
+                  title="Voltar para Home"
                 >
-                  <i className="fas fa-briefcase"></i>
+                  <i className="fas fa-home"></i>
                 </Link>
                 <Link
                   to="/professional/profile"
                   className="icon-btn"
-                  title="Perfil"
+                  title="Meu Perfil"
                 >
                   <i className="fas fa-user"></i>
                 </Link>
-                <a
-                  href="#"
+                <button
                   className="icon-btn"
                   id="logoutBtn"
                   title="Sair"
-                  onClick={handleLogout}
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    if (window.confirm('Deseja realmente sair da sua conta?')) {
+                      await logout();
+                      setToastMessage('🔐 Logout realizado com sucesso!');
+                      setToastType('success');
+                      setTimeout(() => {
+                        navigate('/');
+                      }, 1000);
+                    }
+                  }}
                 >
                   <i className="fas fa-sign-out-alt"></i>
-                </a>
+                </button>
               </div>
             </div>
           </div>
@@ -620,7 +329,7 @@ const Proposals: React.FC = () => {
               className={`filter-btn ${currentFilter === 'PENDENTE' ? 'active' : ''}`}
               onClick={() => setCurrentFilter('PENDENTE')}
             >
-              ⏳ Aguardando resposta
+              ⏳ Aguardando
             </button>
             <button
               className={`filter-btn ${currentFilter === 'ACEITA' ? 'active' : ''}`}
@@ -654,16 +363,8 @@ const Proposals: React.FC = () => {
 
       {toastMessage && (
         <div
-          className={toastType === 'success' ? 'success-toast' : 'toast-msg'}
-          style={
-            toastType === 'success'
-              ? { background: '#f97316' }
-              : {
-                  background: toastMessage.includes('📬')
-                    ? '#2c5a6e'
-                    : '#1f2e3a',
-                }
-          }
+          className={`success-toast ${toastType === 'error' ? 'error-toast' : ''}`}
+          style={toastType === 'normal' ? { background: '#7c2d12' } : undefined}
         >
           {toastMessage}
         </div>
@@ -671,10 +372,10 @@ const Proposals: React.FC = () => {
 
       <link
         rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
       />
       <link
-        href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet"
       />
     </>

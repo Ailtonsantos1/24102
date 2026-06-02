@@ -1,4 +1,3 @@
-
 import type { Request, Response } from "express";
 import { db } from "../../db/connection.js";
 import {
@@ -36,6 +35,12 @@ export class ProfessionalController {
     const { id } = req.params;
 
     try {
+      // Validate that id is a number
+      const numericId = Number(id);
+      if (!Number.isFinite(numericId)) {
+        return res.status(400).json({ erro: "ID inválido" });
+      }
+
       const [profissional] = await db
         .select({
           id: users.id,
@@ -50,7 +55,7 @@ export class ProfessionalController {
           professionalProfiles,
           eq(professionalProfiles.user_id, users.id),
         )
-        .where(and(eq(users.id, Number(id)), eq(users.tipo, "PROFISSIONAL")));
+        .where(and(eq(users.id, numericId), eq(users.tipo, "PROFISSIONAL")));
 
       if (!profissional) {
         return res.status(404).json({ erro: "Profissional não encontrado" });
@@ -76,7 +81,7 @@ export class ProfessionalController {
         })
         .from(ratings)
         .innerJoin(users, eq(users.id, ratings.client_id))
-        .where(eq(ratings.professional_id, Number(id)))
+        .where(eq(ratings.professional_id, numericId))
         .orderBy(desc(ratings.created_at));
 
       res.json({
@@ -86,12 +91,22 @@ export class ProfessionalController {
       });
     } catch (error) {
       console.error(error);
-      res.status(500).json({ erro: "Erro interno do servidor" });
+      const mensagemErro =
+        error instanceof Error ? error.message : "Erro interno do servidor";
+      res.status(500).json({ erro: mensagemErro });
     }
   }
 
   static async criarPerfil(req: Request, res: Response) {
     const user = req.user!;
+
+    // Validate user and userId
+    if (!user || !Number.isFinite(user.userId)) {
+      console.warn(
+        "⚠️ [criarPerfil] Usuário não autenticado ou userId inválido",
+      );
+      return res.status(401).json({ erro: "Usuário não autenticado" });
+    }
 
     if (user.userType !== "PROFISSIONAL") {
       return res
@@ -99,7 +114,17 @@ export class ProfessionalController {
         .json({ erro: "Apenas profissionais podem criar perfil" });
     }
 
-    const { profissao, bio, experiencia, habilidades, localizacao, descricao, cidade, valor_hora, telefone } = req.body;
+    const {
+      profissao,
+      bio,
+      experiencia,
+      habilidades,
+      localizacao,
+      descricao,
+      cidade,
+      valor_hora,
+      telefone,
+    } = req.body;
 
     try {
       const existingProfile = await db
@@ -144,13 +169,23 @@ export class ProfessionalController {
         },
       });
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ erro: "Erro interno do servidor" });
+      console.error("❌ [criarPerfil] Erro completo:", error);
+      const mensagemErro =
+        error instanceof Error ? error.message : "Erro interno do servidor";
+      res.status(500).json({ erro: mensagemErro });
     }
   }
 
   static async atualizarPerfil(req: Request, res: Response) {
     const user = req.user!;
+
+    // Validate user and userId
+    if (!user || !Number.isFinite(user.userId)) {
+      console.warn(
+        "⚠️ [atualizarPerfil] Usuário não autenticado ou userId inválido",
+      );
+      return res.status(401).json({ erro: "Usuário não autenticado" });
+    }
 
     if (user.userType !== "PROFISSIONAL") {
       return res
@@ -158,14 +193,29 @@ export class ProfessionalController {
         .json({ erro: "Apenas profissionais podem atualizar perfil" });
     }
 
-    const { nome, profissao, bio, experiencia, habilidades, localizacao, descricao, cidade, valor_hora, telefone, fotoPerfil } = req.body;
+    const {
+      nome,
+      profissao,
+      bio,
+      experiencia,
+      habilidades,
+      localizacao,
+      descricao,
+      cidade,
+      valor_hora,
+      telefone,
+      fotoPerfil,
+    } = req.body;
 
     try {
       if (nome || fotoPerfil !== undefined) {
         const userUpdateData: any = {};
         if (nome) userUpdateData.nome = nome;
         if (fotoPerfil !== undefined) userUpdateData.foto = fotoPerfil;
-        await db.update(users).set(userUpdateData).where(eq(users.id, user.userId));
+        await db
+          .update(users)
+          .set(userUpdateData)
+          .where(eq(users.id, user.userId));
       }
 
       const existingProfile = await db
@@ -190,9 +240,12 @@ export class ProfessionalController {
         const profileUpdateData: any = {};
         if (profissao !== undefined) profileUpdateData.profissao = profissao;
         if (bio !== undefined) profileUpdateData.bio = bio;
-        if (experiencia !== undefined) profileUpdateData.experiencia = experiencia;
-        if (habilidades !== undefined) profileUpdateData.habilidades = JSON.stringify(habilidades);
-        if (localizacao !== undefined) profileUpdateData.localizacao = localizacao;
+        if (experiencia !== undefined)
+          profileUpdateData.experiencia = experiencia;
+        if (habilidades !== undefined)
+          profileUpdateData.habilidades = JSON.stringify(habilidades);
+        if (localizacao !== undefined)
+          profileUpdateData.localizacao = localizacao;
         if (descricao !== undefined) profileUpdateData.descricao = descricao;
         if (cidade !== undefined) profileUpdateData.cidade = cidade;
         if (valor_hora !== undefined) profileUpdateData.valor_hora = valor_hora;
@@ -206,8 +259,10 @@ export class ProfessionalController {
 
       res.json({ mensagem: "Perfil atualizado com sucesso" });
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ erro: "Erro interno do servidor" });
+      console.error("❌ [atualizarPerfil] Erro completo:", error);
+      const mensagemErro =
+        error instanceof Error ? error.message : "Erro interno do servidor";
+      res.status(500).json({ erro: mensagemErro });
     }
   }
 }

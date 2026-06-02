@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -29,7 +28,7 @@ const Profile = () => {
     message: '',
     isError: false,
   });
-  const toastTimeout = useRef<NodeJS.Timeout | null>(null);
+  const toastTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load user data when usuario changes
   useEffect(() => {
@@ -61,7 +60,11 @@ const Profile = () => {
     }, 3000);
   }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
+  ) => {
     const { id, value } = e.target;
     setFormData((prev) => ({ ...prev, [id]: value }));
   };
@@ -107,7 +110,8 @@ const Profile = () => {
   };
   const closePhotoModal = () => setPhotoModalOpen(false);
   const handlePhotoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) setSelectedPhoto(e.target.files[0]);
+    if (e.target.files && e.target.files[0])
+      setSelectedPhoto(e.target.files[0]);
   };
   const saveProfilePhoto = () => {
     if (!selectedPhoto) {
@@ -118,7 +122,7 @@ const Profile = () => {
     reader.onload = (e) => {
       const imageData = e.target?.result as string;
       setAvatar(imageData);
-      setFormData(prev => ({ ...prev, foto: imageData }));
+      setFormData((prev) => ({ ...prev, foto: imageData }));
       showToast('✅ Foto de perfil atualizada!');
       closePhotoModal();
     };
@@ -524,11 +528,12 @@ textarea {
 
         <div className="profile-card">
           <div className="profile-header">
-            <button 
-              className="edit-profile-link" 
-              onClick={() => isEditing ? cancelChanges() : setIsEditing(true)}
+            <button
+              className="edit-profile-link"
+              onClick={() => (isEditing ? cancelChanges() : setIsEditing(true))}
             >
-              <i className="fas fa-pen"></i> {isEditing ? 'Cancelar' : 'Editar perfil'}
+              <i className="fas fa-pen"></i>{' '}
+              {isEditing ? 'Cancelar' : 'Editar perfil'}
             </button>
             <div className="profile-avatar">
               {avatar ? (
@@ -658,9 +663,9 @@ textarea {
             </h4>
             <div className="form-group">
               <label>Biografia</label>
-              <textarea 
-                id="bio" 
-                value={formData.bio} 
+              <textarea
+                id="bio"
+                value={formData.bio}
                 onChange={handleChange}
                 disabled={!isEditing}
               />

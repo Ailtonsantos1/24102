@@ -33,7 +33,15 @@ export function authenticateToken(
       return res.status(403).json({ erro: 'Token inválido' })
     }
 
-    req.user = decoded as JwtPayload
+    const payload = decoded as JwtPayload;
+    
+    // Validate userId is a finite number
+    if (!payload || typeof payload.userId !== 'number' || !Number.isFinite(payload.userId)) {
+      console.warn('⚠️ [authenticateToken] Invalid userId in token:', payload?.userId);
+      return res.status(403).json({ erro: 'Token inválido' });
+    }
+
+    req.user = payload;
     next()
   })
 }

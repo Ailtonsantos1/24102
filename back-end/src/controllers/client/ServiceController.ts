@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { db } from "../../db/connection.js";
 import { professionalServices, users } from "../../db/schema.js";
-import { eq, desc } from "drizzle-orm";
+import { eq, and, desc, count } from "drizzle-orm";
 
 export class ServiceController {
   static async criar(req: Request, res: Response) {
@@ -15,35 +15,56 @@ export class ServiceController {
         .json({ erro: "Apenas clientes podem criar serviços" });
     }
 
-    const { titulo, descricao, valor, prazo } = req.body;
+    const {
+      titulo,
+      descricao,
+      categoria,
+      preco,
+      urgente,
+      contato,
+      localizacao,
+      fotos,
+    } = req.body;
 
     try {
-      console.log("💾 Inserindo serviço no banco (tabela professionalServices)...");
+      // Check max 3 pending services per client
+      const [countResult] = await db
+        .select({ count: count() })
+        .from(professionalServices)
+        .where(
+          and(
+            eq(professionalServices.client_id, user.userId),
+            eq(professionalServices.status, "PENDENTE"),
+          ),
+        );
+
+      if (countResult.count >= 3) {
+        return res.status(400).json({
+          erro: "Limite de 3 serviços abertos atingido. Finalize ou cancele um serviço para criar outro.",
+        });
+      }
+
       const [servico] = await db
         .insert(professionalServices)
         .values({
           client_id: user.userId,
           titulo,
           descricao,
-          valor: valor ? Number(valor) : null,
-          prazo,
+          categoria,
+          preco: preco ? Number(preco) : null,
+          urgente: urgente ? 1 : 0,
+          contato,
+          localizacao,
+          fotos: fotos ? JSON.stringify(fotos) : null,
           status: "PENDENTE",
         })
-        .returning({ id: professionalServices.id });
+        .returning();
 
       console.log("✅ Serviço criado com sucesso! ID:", servico.id);
 
       res.status(201).json({
         mensagem: "Serviço criado com sucesso",
-        servico: {
-          id: servico.id,
-          client_id: user.userId,
-          titulo,
-          descricao,
-          valor,
-          prazo,
-          status: "PENDENTE",
-        },
+        servico,
       });
     } catch (error) {
       console.error("❌ Erro ao criar serviço:", error);
@@ -82,8 +103,12 @@ export class ServiceController {
           id: professionalServices.id,
           titulo: professionalServices.titulo,
           descricao: professionalServices.descricao,
-          valor: professionalServices.valor,
-          prazo: professionalServices.prazo,
+          categoria: professionalServices.categoria,
+          preco: professionalServices.preco,
+          urgente: professionalServices.urgente,
+          contato: professionalServices.contato,
+          localizacao: professionalServices.localizacao,
+          fotos: professionalServices.fotos,
           status: professionalServices.status,
           created_at: professionalServices.created_at,
           cliente_id: users.id,

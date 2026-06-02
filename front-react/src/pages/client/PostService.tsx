@@ -2,8 +2,7 @@ import React, { useState, useRef, ChangeEvent, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Toast } from '../../components/Toast';
-import { UploadedFile, ToastState } from '../../lib/types';
-import { criarProposta } from '../../services/api';
+import { criarServico, uploadMultipleImages } from '../../services/api';
 
 interface FormData {
   titulo: string;
@@ -13,6 +12,11 @@ interface FormData {
   urgente: boolean;
   contato: string;
   localizacao: string;
+}
+
+interface ToastState {
+  message: string;
+  isError: boolean;
 }
 
 const PostService: React.FC = () => {
@@ -29,8 +33,9 @@ const PostService: React.FC = () => {
     localizacao: '',
   });
 
-  const [fotos, setFotos] = useState<UploadedFile[]>([]);
+  const [fotos, setFotos] = useState<File[]>([]);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const categorias: string[] = [
@@ -57,21 +62,9 @@ const PostService: React.FC = () => {
     fileInputRef.current?.click();
   };
 
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (error) => reject(error);
-    });
-  };
-
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    for (const file of files) {
-      const base64 = await fileToBase64(file);
-      setFotos((prev) => [...prev, { base64, name: file.name }]);
-    }
+    setFotos((prev) => [...prev, ...files]);
   };
 
   const removerFoto = (index: number) => {
@@ -113,56 +106,69 @@ const PostService: React.FC = () => {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (validarFormulario()) {
-      try {
-        const dadosServico = {
-          titulo: formData.titulo,
-          descricao: formData.descricao,
-          categoria: formData.categoria,
-          preco: formData.preco,
-          urgente: formData.urgente,
-          contato: formData.contato,
-          localizacao: formData.localizacao,
-          fotos: fotos.map((f) => f.base64),
-        };
-        await criarProposta(dadosServico);
-        mostrarToast('✅ Serviço publicado com sucesso!');
-        setTimeout(() => navigate('/client/services'), 1500);
-      } catch (error) {
-        console.error(error);
-        mostrarToast('Erro ao publicar serviço', true);
+    if (!validarFormulario() || isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      let fotoUrls: string[] = [];
+      if (fotos.length > 0) {
+        const uploadResult = await uploadMultipleImages(fotos);
+        fotoUrls = uploadResult.urls;
       }
+
+      const dadosServico = {
+        titulo: formData.titulo,
+        descricao: formData.descricao,
+        categoria: formData.categoria,
+        preco: formData.preco,
+        urgente: formData.urgente,
+        contato: formData.contato,
+        localizacao: formData.localizacao,
+        fotos: fotoUrls,
+      };
+      await criarServico(dadosServico);
+      mostrarToast('✅ Serviço publicado com sucesso!');
+      setTimeout(() => navigate('/client/services'), 1300);
+    } catch (error) {
+      console.error(error);
+      mostrarToast('Erro ao publicar serviço', true);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const styles = `
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Inter', sans-serif; background: #f5f7fb; color: #1e293b; padding: 20px; min-height: 100vh; }
-    .publish-container { max-width: 900px; margin: auto; background: #fff; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.08); }
-    .form-header { background: linear-gradient(135deg, #f97316, #ea580c); color: white; padding: 35px; }
-    .form-header h1 { font-size: 28px; display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-    .subhead { opacity: 0.95; font-size: 15px; }
-    .form-content { padding: 30px; }
-    .field-group { margin-bottom: 25px; }
-    .field-label { font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+    body { font-family: 'Inter', sans-serif; background: #f0f4fa; color: #1e293b; padding: 1.5rem; min-height: 100vh; }
+    .publish-container { max-width: 920px; margin: 0 auto; background: white; border-radius: 32px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.08); border: 1px solid #e6eef8; }
+    .form-header { background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; padding: 2rem 2.25rem; display: flex; justify-content: space-between; align-items: center; }
+    .header-content h1 { font-size: 1.75rem; font-weight: 800; margin-bottom: 0.3rem; }
+    .subhead { opacity: 0.95; font-size: 0.95rem; }
+    .back-btn { background: rgba(255,255,255,0.18); border: none; color: white; padding: 0.65rem 1.2rem; border-radius: 24px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; transition: 0.3s; }
+    .back-btn:hover { background: rgba(255,255,255,0.28); }
+    .form-content { padding: 2.25rem; }
+    .field-group { margin-bottom: 1.6rem; }
+    .field-label { font-weight: 700; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.45rem; color: #0f172a; }
     .required-star { color: #dc2626; }
-    input, textarea { width: 100%; padding: 14px; border: 1px solid #dbe2ea; border-radius: 12px; font-size: 15px; transition: 0.3s; background: #fff; }
-    input:focus, textarea:focus { outline: none; border-color: #f97316; box-shadow: 0 0 0 4px rgba(249,115,22,0.15); }
-    textarea { min-height: 140px; resize: vertical; }
-    .hint-text { margin-top: 8px; font-size: 13px; color: #64748b; }
-    .upload-area { border: 2px dashed #cbd5e1; border-radius: 14px; padding: 35px; text-align: center; cursor: pointer; transition: 0.3s; background: #fafcff; }
-    .upload-area:hover { border-color: #f97316; background: #fff7ed; }
-    .upload-area i { font-size: 40px; color: #f97316; margin-bottom: 12px; }
-    .file-list { margin-top: 15px; display: flex; flex-wrap: wrap; gap: 10px; }
-    .file-tag { background: #fff7ed; color: #ea580c; padding: 10px 14px; border-radius: 30px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
-    .checkbox-group, .radio-group { display: flex; flex-wrap: wrap; gap: 12px; }
-    .checkbox-item, .radio-item { background: #f8fafc; border: 1px solid #dbe2ea; border-radius: 12px; padding: 12px 16px; cursor: pointer; transition: 0.3s; display: flex; align-items: center; gap: 8px; }
-    .checkbox-item.selected, .radio-item.selected { border-color: #f97316; background: #fff7ed; }
-    .double-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    .publish-btn { width: 100%; border: none; background: linear-gradient(135deg, #f97316, #ea580c); color: white; padding: 18px; border-radius: 14px; font-size: 17px; font-weight: 600; cursor: pointer; transition: 0.3s; }
-    .publish-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(249,115,22,0.25); }
-    .success-toast { position: fixed; top: 20px; right: 20px; color: white; padding: 16px 20px; border-radius: 12px; z-index: 9999; box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
-    @media (max-width: 768px) { .double-row { grid-template-columns: 1fr; } .form-header h1 { font-size: 22px; } .form-content { padding: 20px; } }
+    input, textarea { width: 100%; padding: 0.9rem 1rem; border: 1px solid #dbe5f5; border-radius: 16px; font-size: 0.95rem; transition: 0.3s; background: white; font-family: inherit; }
+    input:focus, textarea:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18); }
+    textarea { min-height: 130px; resize: vertical; }
+    .hint-text { margin-top: 0.5rem; font-size: 0.85rem; color: #64748b; }
+    .upload-area { border: 2px dashed #cbd5e1; border-radius: 18px; padding: 2.25rem; text-align: center; cursor: pointer; transition: 0.3s; background: #f8fafc; }
+    .upload-area:hover { border-color: #3b82f6; background: #eff6ff; }
+    .upload-area i { font-size: 3rem; color: #3b82f6; margin-bottom: 0.8rem; }
+    .file-list { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.75rem; }
+    .file-tag { background: #eff6ff; color: #1d4ed8; padding: 0.6rem 0.85rem; border-radius: 24px; font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem; }
+    .file-tag img { width: 44px; height: 44px; object-fit: cover; border-radius: 10px; }
+    .checkbox-group, .radio-group { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+    .checkbox-item, .radio-item { background: #f8fafc; border: 1px solid #dbe5f5; border-radius: 16px; padding: 0.7rem 1.1rem; cursor: pointer; transition: 0.3s; display: flex; align-items: center; gap: 0.5rem; font-weight: 500; }
+    .checkbox-item:hover, .radio-item:hover { border-color: #93c5fd; }
+    .checkbox-item.selected, .radio-item.selected { border-color: #3b82f6; background: #eff6ff; color: #1d4ed8; }
+    .double-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
+    .publish-btn { width: 100%; border: none; background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; padding: 1rem; border-radius: 20px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
+    .publish-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(59, 130, 246, 0.3); }
+    .publish-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    @media (max-width: 768px) { .double-row { grid-template-columns: 1fr; } .form-header { flex-direction: column; align-items: flex-start; gap: 0.8rem; } .form-content { padding: 1.5rem; } }
   `;
 
   return (
@@ -170,18 +176,25 @@ const PostService: React.FC = () => {
       <style>{styles}</style>
       <div className="publish-container">
         <div className="form-header">
-          <h1>
-            <i className="fas fa-plus-circle"></i> Publicar novo serviço
-          </h1>
-          <div className="subhead">
-            Preencha os dados abaixo para divulgar seu serviço para milhares de
-            clientes
+          <div className="header-content">
+            <h1>
+              <i className="fas fa-plus-circle"></i> Publicar novo serviço
+            </h1>
+            <div className="subhead">
+              Preencha os dados abaixo para encontrar o profissional ideal
+            </div>
           </div>
+          <button
+            className="back-btn"
+            onClick={() => navigate('/client/services')}
+          >
+            <i className="fas fa-arrow-left"></i> Voltar
+          </button>
         </div>
         <form onSubmit={handleSubmit} className="form-content">
           <div className="field-group">
             <div className="field-label">
-              <i className="fas fa-heading"></i> Título do serviço{' '}
+              <i className="fas fa-heading"></i> Título do serviço
               <span className="required-star">*</span>
             </div>
             <input
@@ -195,7 +208,7 @@ const PostService: React.FC = () => {
 
           <div className="field-group">
             <div className="field-label">
-              <i className="fas fa-align-left"></i> Descrição detalhada{' '}
+              <i className="fas fa-align-left"></i> Descrição detalhada
               <span className="required-star">*</span>
             </div>
             <textarea
@@ -205,7 +218,7 @@ const PostService: React.FC = () => {
               onChange={handleChange}
             />
             <div className="hint-text">
-              Seja o mais claro possível para atrair clientes qualificados.
+              Seja o mais claro possível para atrair profissionais qualificados.
             </div>
           </div>
 
@@ -215,7 +228,9 @@ const PostService: React.FC = () => {
             </div>
             <div className="upload-area" onClick={handleUploadClick}>
               <i className="fas fa-cloud-upload-alt"></i>
-              <div>Clique ou arraste imagens aqui</div>
+              <div style={{ fontWeight: 600, marginBottom: '0.3rem' }}>
+                Clique ou arraste imagens aqui
+              </div>
               <div className="hint-text">JPG, PNG até 5MB cada</div>
             </div>
             <input
@@ -230,27 +245,22 @@ const PostService: React.FC = () => {
               <div className="file-list">
                 {fotos.map((foto, idx) => (
                   <div key={idx} className="file-tag">
-                    <img
-                      src={foto.base64}
-                      alt={foto.name}
-                      style={{
-                        width: '30px',
-                        height: '30px',
-                        objectFit: 'cover',
-                        borderRadius: '6px',
-                      }}
-                    />
+                    <img src={URL.createObjectURL(foto)} alt={foto.name} />
                     {foto.name.length > 20
                       ? foto.name.substring(0, 17) + '...'
                       : foto.name}
                     <i
                       className="fas fa-times-circle"
-                      style={{ cursor: 'pointer', color: '#dc2626' }}
+                      style={{
+                        cursor: 'pointer',
+                        color: '#dc2626',
+                        fontSize: '1.1rem',
+                      }}
                       onClick={(e) => {
                         e.stopPropagation();
                         removerFoto(idx);
                       }}
-                    ></i>
+                    />
                   </div>
                 ))}
               </div>
@@ -259,7 +269,7 @@ const PostService: React.FC = () => {
 
           <div className="field-group">
             <div className="field-label">
-              <i className="fas fa-tags"></i> Categoria{' '}
+              <i className="fas fa-tags"></i> Categoria
               <span className="required-star">*</span>
             </div>
             <div className="radio-group">
@@ -285,7 +295,7 @@ const PostService: React.FC = () => {
           <div className="double-row">
             <div className="field-group">
               <div className="field-label">
-                <i className="fas fa-dollar-sign"></i> Preço sugerido (R$){' '}
+                <i className="fas fa-dollar-sign"></i> Preço sugerido (R$)
                 <span className="required-star">*</span>
               </div>
               <input
@@ -302,13 +312,13 @@ const PostService: React.FC = () => {
               <div className="field-label">
                 <i className="fas fa-bolt"></i> Urgência
               </div>
-              <label className="checkbox-item">
+              <label className="checkbox-item" style={{ marginTop: '0.6rem' }}>
                 <input
                   type="checkbox"
                   name="urgente"
                   checked={formData.urgente}
                   onChange={handleChange}
-                />
+                />{' '}
                 Este serviço é urgente (precisa de atendimento rápido)
               </label>
             </div>
@@ -317,7 +327,7 @@ const PostService: React.FC = () => {
           <div className="double-row">
             <div className="field-group">
               <div className="field-label">
-                <i className="fas fa-phone-alt"></i> Contato{' '}
+                <i className="fas fa-phone-alt"></i> Contato
                 <span className="required-star">*</span>
               </div>
               <input
@@ -331,7 +341,7 @@ const PostService: React.FC = () => {
 
             <div className="field-group">
               <div className="field-label">
-                <i className="fas fa-map-marker-alt"></i> Localização{' '}
+                <i className="fas fa-map-marker-alt"></i> Localização
                 <span className="required-star">*</span>
               </div>
               <input
@@ -341,12 +351,15 @@ const PostService: React.FC = () => {
                 value={formData.localizacao}
                 onChange={handleChange}
               />
-              <div className="hint-text">O cliente verá essa informação</div>
+              <div className="hint-text">
+                O profissional verá essa informação
+              </div>
             </div>
           </div>
 
-          <button type="submit" className="publish-btn">
-            <i className="fas fa-paper-plane"></i> Publicar serviço
+          <button type="submit" className="publish-btn" disabled={isSubmitting}>
+            <i className="fas fa-paper-plane"></i>{' '}
+            {isSubmitting ? 'Publicando...' : 'Publicar serviço'}
           </button>
         </form>
       </div>
@@ -364,7 +377,7 @@ const PostService: React.FC = () => {
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
       />
       <link
-        href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet"
       />
     </>

@@ -1,10 +1,6 @@
-
 import type { Request, Response } from "express";
 import { db } from "../../db/connection.js";
-import {
-  professionalProfiles,
-  professionalServices,
-} from "../../db/schema.js";
+import { professionalProfiles, professionalServices } from "../../db/schema.js";
 import { eq, and } from "drizzle-orm";
 
 export class ServiceController {
@@ -17,7 +13,8 @@ export class ServiceController {
         .json({ erro: "Apenas profissionais podem adicionar serviços" });
     }
 
-    const { categoria, subcategoria, urgente, contato, localizacao, fotos } = req.body;
+    const { categoria, subcategoria, urgente, contato, localizacao, fotos } =
+      req.body;
 
     try {
       const [profile] = await db
@@ -34,7 +31,7 @@ export class ServiceController {
       const [servico] = await db
         .insert(professionalServices)
         .values({
-          professional_profile_id: profile.id,
+          client_id: profile.id,
           categoria,
           subcategoria,
           urgente: urgente ? 1 : 0,
@@ -47,7 +44,7 @@ export class ServiceController {
       res.status(201).json({
         mensagem: "Serviço adicionado com sucesso",
         servico: {
-          id: servico.id,
+          id: servico!.id,
           professional_profile_id: profile.id,
           categoria,
           subcategoria,

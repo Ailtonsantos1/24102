@@ -9,6 +9,7 @@ const Home = () => {
   const [servicosDisponiveis, setServicosDisponiveis] = useState([]);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
+  const [location, setLocation] = useState('Brasília - DF');
   const toastTimeoutRef = useRef(null);
 
   const showToastMessage = (message) => {
@@ -33,53 +34,102 @@ const Home = () => {
   }, []);
 
   const userName = usuario?.nome || 'Profissional';
-  const [location, setLocation] = useState('Brasília - DF');
 
   const handleCardClick = (servico) => {
     navigate(`/professional/service-details/${servico.id}`, {
       state: { servico },
     });
   };
+
   const handleEditLocation = () => {
     const newLocation = prompt('Digite sua cidade e UF:', location);
     if (newLocation) setLocation(newLocation);
   };
+
   const handleLogout = async () => {
     await logout();
     navigate('/');
   };
 
+  const handleAnnouncementClick = (title) => {
+    showToastMessage(`✅ ${title} em desenvolvimento!`);
+  };
+
+  // Fake announcements for professionals
+  const announcements = [
+    {
+      id: 1,
+      title: '💼 Premium Profissional',
+      description: 'Ganhe destaque nos resultados de busca!',
+      subText: 'Primeiro mês gratuito',
+      gradient: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+      icon: 'fa-gem',
+    },
+    {
+      id: 2,
+      title: '📊 Relatórios Avançados',
+      description: 'Acompanhe suas métricas em tempo real!',
+      subText: 'Disponível para todos',
+      gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+      icon: 'fa-chart-line',
+    },
+    {
+      id: 3,
+      title: '💬 Chat em Tempo Real',
+      description: 'Comunique-se diretamente com os clientes!',
+      subText: 'Novidade exclusiva',
+      gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+      icon: 'fa-comments',
+    },
+  ];
+
   const styles = `
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #f4f6fc; font-family: 'Inter', sans-serif; padding: 0 0 32px 0; color: #1e2e3e; }
-    .user-header { width: 100%; background: white; padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.08); position: sticky; top: 0; z-index: 100; flex-wrap: wrap; gap: 16px; }
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+    body { background: #fff7ed; color: #1f2937; padding: 0 0 32px 0; }
+    .user-header { width: 100%; background: white; padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.08); position: sticky; top: 0; z-index: 100; flex-wrap: wrap; gap: 16px; border-bottom: 1px solid #fed7aa; }
     .user-info h2 { font-size: 24px; margin-bottom: 5px; color: #111827; }
     .user-location { color: #6b7280; font-size: 14px; display: flex; align-items: center; gap: 6px; }
     .user-actions { display: flex; gap: 12px; flex-wrap: wrap; }
-    .icon-btn { width: 45px; height: 45px; border: none; border-radius: 12px; background: #f3f4f6; color: #374151; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; font-size: 18px; transition: 0.3s; cursor: pointer; }
-    .icon-btn:hover { background: #f97316; color: white; transform: translateY(-2px); }
-    .profile-location-card { background: white; margin: 20px 20px 24px 20px; border-radius: 28px; padding: 18px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; box-shadow: 0 6px 14px rgba(0,0,0,0.03); border: 1px solid #eef2f8; }
-    .user-info-card { display: flex; align-items: center; gap: 14px; }
-    .avatar { width: 52px; height: 52px; background: #eef2fb; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; }
-    .user-details h3 { font-size: 1.25rem; font-weight: 700; color: #1f3b4c; }
-    .location { display: flex; align-items: center; gap: 6px; color: #5f7d9c; font-size: 0.85rem; margin-top: 4px; }
-    .edit-icon { background: #f0f4fa; padding: 8px 16px; border-radius: 40px; font-size: 0.8rem; font-weight: 600; color: #2c5a6e; cursor: pointer; transition: 0.2s; }
-    .edit-icon:hover { background: #e6edf6; }
-    .container { max-width: 1300px; margin: 0 auto; padding: 0 20px; }
-    .section-title { font-size: 1.5rem; font-weight: 700; color: #1f3b4c; margin: 28px 0 16px 0; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; justify-content: space-between; }
-    .services-grid { display: flex; flex-wrap: wrap; gap: 24px; margin-bottom: 32px; }
-    .service-card { flex: 1; min-width: 260px; background: white; border-radius: 28px; padding: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); transition: all 0.25s; border: 1px solid #eef2fa; cursor: pointer; }
-    .service-card:hover { transform: translateY(-4px); box-shadow: 0 20px 25px -12px rgba(0,0,0,0.12); border-color: #d4e2f0; }
-    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-    .prof-name { font-weight: 800; font-size: 1.2rem; color: #1f3b4c; }
-    .rating { background: #f5b34220; padding: 4px 10px; border-radius: 30px; color: #c97e00; font-weight: 700; font-size: 0.85rem; }
-    .service-name { font-size: 1rem; font-weight: 600; color: #2c5e6e; background: #eef6fa; display: inline-block; padding: 5px 14px; border-radius: 40px; margin: 12px 0; }
-    .service-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; border-top: 1px solid #edf2f8; padding-top: 14px; }
-    .urgent-badge { background: #ffe8e6; color: #bc3900; font-size: 0.75rem; font-weight: 700; padding: 4px 12px; border-radius: 40px; }
-    .distance-price { display: flex; gap: 12px; font-size: 0.85rem; font-weight: 500; color: #5a6e8a; }
-    .success-toast { position: fixed; top: 80px; right: 20px; padding: 12px 20px; border-radius: 40px; color: white; font-weight: 600; z-index: 9999; background: #f97316; box-shadow: 0 4px 12px rgba(0,0,0,0.15); animation: fadeInOut 3s ease forwards; }
+    .icon-btn { width: 45px; height: 45px; border: none; border-radius: 12px; background: #fff7ed; color: #f97316; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; font-size: 18px; transition: 0.3s; cursor: pointer; }
+    .icon-btn:hover { background: #f97316; color: white; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3); }
+    .profile-location-card { background: white; margin: 20px 40px 24px 40px; border-radius: 24px; padding: 20px 26px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; box-shadow: 0 6px 14px rgba(0,0,0,0.05); border: 1px solid #fed7aa; }
+    .user-info-card { display: flex; align-items: center; gap: 16px; }
+    .avatar { width: 64px; height: 64px; background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: white; font-weight: 700; }
+    .user-details h3 { font-size: 1.4rem; font-weight: 700; color: #1f2937; }
+    .user-details span { color: #9ca3af; font-size: 0.9rem; }
+    .location { display: flex; align-items: center; gap: 6px; color: #6b7280; font-size: 0.9rem; margin-top: 4px; }
+    .edit-icon { background: #fff7ed; padding: 10px 18px; border-radius: 40px; font-size: 0.85rem; font-weight: 600; color: #c2410c; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 6px; }
+    .edit-icon:hover { background: #fed7aa; }
+    .container { max-width: 1400px; margin: 0 auto; padding: 0 40px; display: grid; grid-template-columns: 2fr 1fr; gap: 28px; }
+    .section-title { font-size: 1.6rem; font-weight: 700; color: #1f2937; margin: 16px 0 20px 0; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; justify-content: space-between; }
+    .services-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-bottom: 32px; }
+    .service-card { background: white; border-radius: 24px; padding: 24px; box-shadow: 0 5px 15px rgba(0,0,0,0.06); transition: all 0.3s; border: 1px solid #fed7aa; cursor: pointer; }
+    .service-card:hover { transform: translateY(-6px); box-shadow: 0 15px 30px rgba(249, 115, 22, 0.15); border-color: #fb923c; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .client-info { display: flex; align-items: center; gap: 12px; }
+    .client-avatar { width: 48px; height: 48px; background: linear-gradient(135deg, #fed7aa 0%, #fdba74 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #c2410c; font-weight: 700; font-size: 1.3rem; }
+    .client-name { font-weight: 700; font-size: 1.05rem; color: #1f2937; }
+    .urgent-badge { background: #fee2e2; color: #dc2626; font-size: 0.75rem; font-weight: 700; padding: 6px 14px; border-radius: 40px; display: flex; align-items: center; gap: 5px; }
+    .service-name { font-size: 1.05rem; font-weight: 700; color: #c2410c; background: #fff7ed; display: inline-block; padding: 6px 14px; border-radius: 40px; margin: 14px 0; }
+    .service-description { color: #6b7280; margin-bottom: 16px; line-height: 1.5; font-size: 0.95rem; }
+    .service-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; border-top: 1px solid #fed7aa; padding-top: 14px; }
+    .distance-price { display: flex; gap: 16px; font-size: 0.9rem; font-weight: 600; color: #6b7280; }
+    .price-tag { color: #16a34a; font-size: 1.1rem; font-weight: 700; }
+    .announcements-grid { display: flex; flex-direction: column; gap: 18px; }
+    .announcement-card { color: white; padding: 24px; border-radius: 24px; cursor: pointer; transition: transform 0.3s, box-shadow 0.3s; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+    .announcement-card:hover { transform: translateY(-4px); box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
+    .announcement-card h4 { margin-bottom: 10px; font-size: 18px; display: flex; align-items: center; gap: 10px; }
+    .announcement-card p { margin-bottom: 6px; font-size: 14px; opacity: 0.95; }
+    .announcement-subtext { font-size: 12px; opacity: 0.85; font-style: italic; }
+    .success-toast { position: fixed; top: 80px; right: 20px; padding: 14px 24px; border-radius: 40px; color: white; font-weight: 600; z-index: 9999; background: #f97316; box-shadow: 0 4px 15px rgba(249, 115, 22, 0.35); animation: fadeInOut 3s ease forwards; }
     @keyframes fadeInOut { 0% { opacity: 0; transform: translateX(20px); } 15% { opacity: 1; transform: translateX(0); } 85% { opacity: 1; transform: translateX(0); } 100% { opacity: 0; transform: translateX(20px); visibility: hidden; } }
-    @media (max-width: 680px) { .user-header { padding: 16px 20px; flex-direction: column; align-items: flex-start; } .profile-location-card { margin: 12px 16px 20px; } .container { padding: 0 16px; } }
+    @media (max-width: 1024px) { 
+      .container { grid-template-columns: 1fr; padding: 0 20px; } 
+      .profile-location-card { margin: 20px 20px 24px 20px; }
+    }
+    @media (max-width: 680px) { 
+      .user-header { padding: 16px 20px; flex-direction: column; align-items: flex-start; } 
+    }
   `;
 
   return (
@@ -87,7 +137,7 @@ const Home = () => {
       <style>{styles}</style>
       <div className="user-header">
         <div className="user-info">
-          <h2>Olá, {userName.split(' ')[0]}</h2>
+          <h2>Olá, {userName.split(' ')[0]}!👋</h2>
           <div className="user-location">
             <i className="fas fa-map-marker-alt"></i> {location}
           </div>
@@ -96,73 +146,198 @@ const Home = () => {
           <button
             className="icon-btn"
             onClick={() => navigate('/professional/home')}
+            title="Início"
           >
             <i className="fas fa-home"></i>
           </button>
           <button
             className="icon-btn"
             onClick={() => navigate('/professional/proposals')}
+            title="Minhas Propostas"
           >
             <i className="fas fa-briefcase"></i>
           </button>
           <button
             className="icon-btn"
             onClick={() => navigate('/professional/profile')}
+            title="Perfil"
           >
             <i className="fas fa-user"></i>
           </button>
-          <button className="icon-btn" onClick={handleLogout}>
+          <button className="icon-btn" onClick={handleLogout} title="Sair">
             <i className="fas fa-sign-out-alt"></i>
           </button>
         </div>
       </div>
+
       <div className="profile-location-card">
         <div className="user-info-card">
-          <div className="avatar">👤</div>
+          <div className="avatar">{userName.charAt(0).toUpperCase()}</div>
           <div className="user-details">
             <h3>{userName}</h3>
             <div className="location">
-              <span>📍</span> {location}
+              <i className="fas fa-map-marker-alt"></i> {location}
             </div>
           </div>
         </div>
         <div className="edit-icon" onClick={handleEditLocation}>
-          Alterar local
+          <i className="fas fa-pen"></i> Alterar local
         </div>
       </div>
+
       <div className="container">
-        <div className="section-title">
-          🔧 Serviços Recomendados <span>Próximo de você</span>
-        </div>
-        <div className="services-grid">
-          {servicosDisponiveis.map((servico) => (
-            <div
-              key={servico.id}
-              className="service-card"
-              onClick={() => handleCardClick(servico)}
+        <div className="services-section">
+          <div className="section-title">
+            <span>
+              <i className="fas fa-wrench"></i> Serviços Recomendados
+            </span>
+            <span
+              style={{ fontSize: '1rem', color: '#6b7280', fontWeight: '500' }}
             >
-              <div className="card-header">
-                <span className="prof-name">{servico.cliente_nome}</span>
-                <span className="rating">⭐ Novo</span>
+              {servicosDisponiveis.length} serviços disponíveis
+            </span>
+          </div>
+
+          <div className="services-grid">
+            {servicosDisponiveis.length > 0 ? (
+              servicosDisponiveis.map((servico) => (
+                <div
+                  key={servico.id}
+                  className="service-card"
+                  onClick={() => handleCardClick(servico)}
+                >
+                  <div className="card-header">
+                    <div className="client-info">
+                      <div className="client-avatar">
+                        {servico.cliente_nome.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="client-name">{servico.cliente_nome}</div>
+                    </div>
+                    {servico.urgente === 1 && (
+                      <span className="urgent-badge">
+                        <i className="fas fa-bolt"></i> Urgente
+                      </span>
+                    )}
+                  </div>
+                  <div className="service-name">{servico.titulo}</div>
+                  {servico.descricao && (
+                    <div className="service-description">
+                      {servico.descricao.length > 100
+                        ? servico.descricao.substring(0, 100) + '...'
+                        : servico.descricao}
+                    </div>
+                  )}
+                  <div className="service-footer">
+                    <div className="distance-price">
+                      <span>
+                        <i className="fas fa-map-marker-alt"></i>{' '}
+                        {servico.localizacao || 'Não informado'}
+                      </span>
+                      {servico.preco && (
+                        <span className="price-tag">
+                          💰 R${Number(servico.preco).toFixed(2)}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      style={{
+                        background: '#f97316',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '12px',
+                        padding: '8px 14px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        transition: '0.2s',
+                      }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.background = '#ea580c')
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.background = '#f97316')
+                      }
+                    >
+                      Ver detalhes{' '}
+                      <i
+                        className="fas fa-arrow-right"
+                        style={{ marginLeft: '4px' }}
+                      ></i>
+                    </button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div
+                style={{
+                  background: 'white',
+                  padding: '60px 40px',
+                  borderRadius: '24px',
+                  textAlign: 'center',
+                  gridColumn: '1/-1',
+                  border: '1px dashed #fed7aa',
+                }}
+              >
+                <i
+                  className="fas fa-inbox"
+                  style={{
+                    fontSize: '4rem',
+                    marginBottom: '1rem',
+                    color: '#fb923c',
+                  }}
+                ></i>
+                <h3
+                  style={{
+                    fontSize: '1.4rem',
+                    marginBottom: '8px',
+                    color: '#1f2937',
+                  }}
+                >
+                  Nenhum serviço disponível no momento
+                </h3>
+                <p style={{ color: '#9ca3af', fontSize: '1rem' }}>
+                  Volte mais tarde para ver novas oportunidades!
+                </p>
               </div>
-              <div className="service-name">{servico.titulo}</div>
-              <div className="service-footer">
-                <div className="distance-price">
-                  📍 {servico.prazo || '—'} •{' '}
-                  {servico.valor ? `R$${servico.valor.toFixed(2)}` : '—'}
+            )}
+          </div>
+        </div>
+
+        <div className="announcements-section">
+          <div className="section-title">
+            <span>
+              <i className="fas fa-star"></i> Novidades para Você
+            </span>
+          </div>
+          <div className="announcements-grid">
+            {announcements.map((announcement) => (
+              <div
+                key={announcement.id}
+                className="announcement-card"
+                style={{ background: announcement.gradient }}
+                onClick={() => handleAnnouncementClick(announcement.title)}
+              >
+                <h4>
+                  <i className={`fas ${announcement.icon}`}></i>{' '}
+                  {announcement.title}
+                </h4>
+                <p>{announcement.description}</p>
+                <div className="announcement-subtext">
+                  {announcement.subText}
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
+
       {toastVisible && <div className="success-toast">{toastMessage}</div>}
       <link
         rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
       />
       <link
-        href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet"
       />
     </>

@@ -1,227 +1,382 @@
-
-import type { Request, Response } from 'express'
-import { db } from '../../db/connection.js'
+import type { Request, Response } from "express";
+import { db } from "../../db/connection.js";
 import {
-  proposals,
+  professionalServices,
   proposalProfessionals,
   users,
-  professionalProfiles,
-} from '../../db/schema.js'
-import { eq, and, desc } from 'drizzle-orm'
+} from "../../db/schema.js";
+import { eq, and, desc } from "drizzle-orm";
 
 export class ProposalController {
   static async enviar(req: Request, res: Response) {
-    const user = req.user!
-    const { serviceId, valor, mensagem } = req.body
+    const user = req.user!;
+    const { servicoId, valor, mensagem, negociavel } = req.body;
 
-    if (user.userType !== 'PROFISSIONAL') {
-      return res
-        .status(403)
-        .json({ erro: 'Apenas profissionais podem enviar propostas' })
+    console.log("🔍 [enviar] Dados recebidos:", {
+      servicoId,
+      valor,
+      mensagem,
+      negociavel,
+      user,
+    });
+
+    // Validate user and userId
+    if (!user || !Number.isFinite(user.userId)) {
+      console.warn("⚠️ [enviar] Usuário não autenticado ou userId inválido");
+      return res.status(401).json({ erro: "Usuário não autenticado" });
     }
 
-    console.log('📤 Enviando proposta para serviço ID:', serviceId)
+    if (user.userType !== "PROFISSIONAL") {
+      console.warn("⚠️ [enviar] Acesso negado - usuário não é profissional");
+      return res
+        .status(403)
+        .json({ erro: "Apenas profissionais podem enviar propostas" });
+    }
+
+    if (!servicoId) {
+      console.warn("⚠️ [enviar] servicoId não fornecido");
+      return res.status(400).json({ erro: "ID do serviço é obrigatório" });
+    }
+
+    console.log("📤 [enviar] Enviando proposta para serviço ID:", servicoId);
 
     try {
+      console.log("🔍 [enviar] Buscando serviço no banco...");
       const [servico] = await db
         .select()
-        .from(proposals)
-        .where(eq(proposals.id, Number(serviceId)))
+        .from(professionalServices)
+        .where(eq(professionalServices.id, Number(servicoId)));
 
       if (!servico) {
-        console.log('❌ Serviço não encontrado')
-        return res.status(404).json({ erro: 'Serviço não encontrado' })
+        console.warn("⚠️ [enviar] Serviço não encontrado no banco");
+        return res.status(404).json({ erro: "Serviço não encontrado" });
       }
 
+      console.log("✅ [enviar] Serviço encontrado, inserindo proposta...");
       const [proposta] = await db
         .insert(proposalProfessionals)
         .values({
-          proposal_id: Number(serviceId),
+          service_id: Number(servicoId),
           professional_id: user.userId,
-          status: 'PENDENTE',
+          mensagem,
+          valor: valor ? Number(valor) : null,
+          negociavel: negociavel ? 1 : 0,
+          status: "PENDENTE",
         })
-        .returning({ id: proposalProfessionals.id })
+        .returning();
 
-      console.log('✅ Proposta enviada com sucesso, ID:', proposta.id)
-
+      console.log("✅ [enviar] Proposta enviada com sucesso, ID:", proposta.id);
       res.status(201).json({
-        mensagem: 'Proposta enviada com sucesso',
-        proposta: {
-          id: proposta.id,
-          proposal_id: Number(serviceId),
-          professional_id: user.userId,
-          status: 'PENDENTE',
-        },
-      })
+        mensagem: "Proposta enviada com sucesso",
+        proposta,
+      });
     } catch (error) {
-      console.error('❌ Erro ao enviar proposta:', error)
-      res.status(500).json({ erro: 'Erro interno do servidor' })
+      console.error("❌ [enviar] Erro completo ao enviar proposta:", {
+        message: error instanceof Error ? error.message : "Erro desconhecido",
+        stack: error instanceof Error ? error.stack : undefined,
+        error,
+      });
+      const mensagemErro =
+        error instanceof Error
+          ? `Erro ao enviar proposta: ${error.message}`
+          : "Erro interno do servidor";
+      res.status(500).json({ erro: mensagemErro });
     }
   }
 
   static async listarMinhas(req: Request, res: Response) {
-    const user = req.user!
+    const user = req.user!;
 
-    console.log('📋 Listando propostas do profissional ID:', user.userId)
+    // Validate user and userId
+    if (!user || !Number.isFinite(user.userId)) {
+      console.warn(
+        "⚠️ [listarMinhas] Usuário não autenticado ou userId inválido",
+      );
+      return res.status(401).json({ erro: "Usuário não autenticado" });
+    }
+
+    console.log(
+      "🔍 [listarMinhas] Iniciando listagem para profissional ID:",
+      user.userId,
+    );
 
     try {
+      console.log("🔍 [listarMinhas] Consultando banco de dados...");
       const propostas = await db
         .select({
-          id: proposals.id,
-          client_id: proposals.client_id,
-          titulo: proposals.titulo,
-          descricao: proposals.descricao,
-          valor: proposals.valor,
-          prazo: proposals.prazo,
-          status: proposals.status,
-          created_at: proposals.created_at,
-          proposalProfessional: proposalProfessionals,
+          id: proposalProfessionals.id,
+          service_id: proposalProfessionals.service_id,
+          professional_id: proposalProfessionals.professional_id,
+          mensagem: proposalProfessionals.mensagem,
+          valor: proposalProfessionals.valor,
+          negociavel: proposalProfessionals.negociavel,
+          status: proposalProfessionals.status,
+          created_at: proposalProfessionals.created_at,
+          servico: professionalServices,
+          cliente: {
+            id: users.id,
+            nome: users.nome,
+            foto: users.foto,
+          },
         })
-        .from(proposals)
+        .from(proposalProfessionals)
         .innerJoin(
-          proposalProfessionals,
-          eq(proposalProfessionals.proposal_id, proposals.id)
+          professionalServices,
+          eq(proposalProfessionals.service_id, professionalServices.id),
         )
+        .innerJoin(users, eq(professionalServices.client_id, users.id))
         .where(eq(proposalProfessionals.professional_id, user.userId))
-        .orderBy(desc(proposals.created_at))
+        .orderBy(desc(proposalProfessionals.created_at));
 
-      console.log('✅', propostas.length, 'propostas encontradas')
-      res.json(propostas)
+      console.log(
+        "✅ [listarMinhas]",
+        propostas.length,
+        "propostas encontradas",
+      );
+      res.json({ propostas });
     } catch (error) {
-      console.error('❌ Erro ao listar propostas:', error)
-      res.status(500).json({ erro: 'Erro interno do servidor' })
+      console.error("❌ [listarMinhas] Erro completo ao listar propostas:", {
+        message: error instanceof Error ? error.message : "Erro desconhecido",
+        stack: error instanceof Error ? error.stack : undefined,
+        error,
+      });
+      const mensagemErro =
+        error instanceof Error
+          ? `Erro ao listar propostas: ${error.message}`
+          : "Erro interno do servidor";
+      res.status(500).json({ erro: mensagemErro });
     }
   }
 
   static async aceitar(req: Request, res: Response) {
-    const user = req.user!
-    const { id } = req.params
+    const user = req.user!;
+    const { id } = req.params;
 
-    if (user.userType !== 'PROFISSIONAL') {
-      return res
-        .status(403)
-        .json({ erro: 'Apenas profissionais podem aceitar propostas' })
+    // Validate user and userId
+    if (!user || !Number.isFinite(user.userId)) {
+      console.warn("⚠️ [aceitar] Usuário não autenticado ou userId inválido");
+      return res.status(401).json({ erro: "Usuário não autenticado" });
     }
 
-    console.log('✅ Aceitando proposta ID:', id)
+    console.log("🔍 [aceitar] Dados recebidos:", { id, user });
+
+    if (user.userType !== "PROFISSIONAL") {
+      console.warn("⚠️ [aceitar] Acesso negado - usuário não é profissional");
+      return res
+        .status(403)
+        .json({ erro: "Apenas profissionais podem aceitar propostas" });
+    }
+
+    if (!id) {
+      console.warn("⚠️ [aceitar] ID da proposta não fornecido");
+      return res.status(400).json({ erro: "ID da proposta é obrigatório" });
+    }
+
+    console.log("✅ [aceitar] Iniciando processo de aceitar proposta ID:", id);
 
     try {
+      console.log("🔍 [aceitar] Buscando proposta no banco...");
       const [pp] = await db
         .select()
         .from(proposalProfessionals)
         .where(
           and(
             eq(proposalProfessionals.id, Number(id)),
-            eq(proposalProfessionals.professional_id, user.userId)
-          )
-        )
+            eq(proposalProfessionals.professional_id, user.userId),
+          ),
+        );
 
       if (!pp) {
-        console.log('❌ Proposta não encontrada')
-        return res.status(404).json({ erro: 'Registro não encontrado' })
+        console.warn("⚠️ [aceitar] Proposta não encontrada no banco");
+        return res.status(404).json({ erro: "Registro não encontrado" });
       }
 
+      console.log("🔍 [aceitar] Atualizando status da proposta para ACEITA...");
       await db
         .update(proposalProfessionals)
-        .set({ status: 'ACEITA' })
-        .where(eq(proposalProfessionals.id, Number(id)))
+        .set({ status: "ACEITA" })
+        .where(eq(proposalProfessionals.id, Number(id)));
 
-      console.log('✅ Proposta aceita com sucesso')
-      res.json({ mensagem: 'Proposta aceita com sucesso' })
+      console.log(
+        "🔍 [aceitar] Atualizando status do serviço para EM_ANDAMENTO...",
+      );
+      await db
+        .update(professionalServices)
+        .set({ status: "EM_ANDAMENTO" })
+        .where(eq(professionalServices.id, pp.service_id));
+
+      console.log("✅ [aceitar] Proposta aceita com sucesso!");
+      res.json({ mensagem: "Proposta aceita com sucesso" });
     } catch (error) {
-      console.error('❌ Erro ao aceitar proposta:', error)
-      res.status(500).json({ erro: 'Erro interno do servidor' })
+      console.error("❌ [aceitar] Erro completo ao aceitar proposta:", {
+        message: error instanceof Error ? error.message : "Erro desconhecido",
+        stack: error instanceof Error ? error.stack : undefined,
+        error,
+      });
+      const mensagemErro =
+        error instanceof Error
+          ? `Erro ao aceitar proposta: ${error.message}`
+          : "Erro interno do servidor";
+      res.status(500).json({ erro: mensagemErro });
     }
   }
 
   static async recusar(req: Request, res: Response) {
-    const user = req.user!
-    const { id } = req.params
+    const user = req.user!;
+    const { id } = req.params;
 
-    if (user.userType !== 'PROFISSIONAL') {
-      return res
-        .status(403)
-        .json({ erro: 'Apenas profissionais podem recusar propostas' })
+    // Validate user and userId
+    if (!user || !Number.isFinite(user.userId)) {
+      console.warn("⚠️ [recusar] Usuário não autenticado ou userId inválido");
+      return res.status(401).json({ erro: "Usuário não autenticado" });
     }
 
-    console.log('❌ Recusando proposta ID:', id)
+    console.log("🔍 [recusar] Dados recebidos:", { id, user });
+
+    if (user.userType !== "PROFISSIONAL") {
+      console.warn("⚠️ [recusar] Acesso negado - usuário não é profissional");
+      return res
+        .status(403)
+        .json({ erro: "Apenas profissionais podem recusar propostas" });
+    }
+
+    if (!id) {
+      console.warn("⚠️ [recusar] ID da proposta não fornecido");
+      return res.status(400).json({ erro: "ID da proposta é obrigatório" });
+    }
+
+    console.log("❌ [recusar] Iniciando processo de recusar proposta ID:", id);
 
     try {
+      console.log("🔍 [recusar] Buscando proposta no banco...");
       const [pp] = await db
         .select()
         .from(proposalProfessionals)
         .where(
           and(
             eq(proposalProfessionals.id, Number(id)),
-            eq(proposalProfessionals.professional_id, user.userId)
-          )
-        )
+            eq(proposalProfessionals.professional_id, user.userId),
+          ),
+        );
 
       if (!pp) {
-        console.log('❌ Proposta não encontrada')
-        return res.status(404).json({ erro: 'Registro não encontrado' })
+        console.warn("⚠️ [recusar] Proposta não encontrada no banco");
+        return res.status(404).json({ erro: "Registro não encontrado" });
       }
 
+      console.log(
+        "🔍 [recusar] Atualizando status da proposta para RECUSADA...",
+      );
       await db
         .update(proposalProfessionals)
-        .set({ status: 'RECUSADA' })
-        .where(eq(proposalProfessionals.id, Number(id)))
+        .set({ status: "RECUSADA" })
+        .where(eq(proposalProfessionals.id, Number(id)));
 
-      console.log('✅ Proposta recusada com sucesso')
-      res.json({ mensagem: 'Proposta recusada com sucesso' })
+      console.log("✅ [recusar] Proposta recusada com sucesso!");
+      res.json({ mensagem: "Proposta recusada com sucesso" });
     } catch (error) {
-      console.error('❌ Erro ao recusar proposta:', error)
-      res.status(500).json({ erro: 'Erro interno do servidor' })
+      console.error("❌ [recusar] Erro completo ao recusar proposta:", {
+        message: error instanceof Error ? error.message : "Erro desconhecido",
+        stack: error instanceof Error ? error.stack : undefined,
+        error,
+      });
+      const mensagemErro =
+        error instanceof Error
+          ? `Erro ao recusar proposta: ${error.message}`
+          : "Erro interno do servidor";
+      res.status(500).json({ erro: mensagemErro });
     }
   }
 
   static async marcarConcluido(req: Request, res: Response) {
-    const user = req.user!
-    const { proposalProfessionalId } = req.params
+    const user = req.user!;
+    const { id } = req.params;
 
-    if (user.userType !== 'PROFISSIONAL') {
-      return res
-        .status(403)
-        .json({ erro: 'Apenas profissionais podem marcar serviços como concluídos' })
+    // Validate user and userId
+    if (!user || !Number.isFinite(user.userId)) {
+      console.warn(
+        "⚠️ [marcarConcluido] Usuário não autenticado ou userId inválido",
+      );
+      return res.status(401).json({ erro: "Usuário não autenticado" });
     }
 
-    console.log('🏁 Marcando serviço como concluído, proposalProfessionalId:', proposalProfessionalId)
+    console.log("🔍 [marcarConcluido] Dados recebidos:", { id, user });
+
+    if (user.userType !== "PROFISSIONAL") {
+      console.warn(
+        "⚠️ [marcarConcluido] Acesso negado - usuário não é profissional",
+      );
+      return res.status(403).json({
+        erro: "Apenas profissionais podem marcar serviços como concluídos",
+      });
+    }
+
+    if (!id) {
+      console.warn("⚠️ [marcarConcluido] ID da proposta não fornecido");
+      return res.status(400).json({ erro: "ID da proposta é obrigatório" });
+    }
+
+    console.log(
+      "🏁 [marcarConcluido] Iniciando processo para marcar como concluído, proposal ID:",
+      id,
+    );
 
     try {
+      console.log(
+        "🔍 [marcarConcluido] Buscando proposta profissional no banco...",
+      );
       const [pp] = await db
         .select()
         .from(proposalProfessionals)
         .where(
           and(
-            eq(proposalProfessionals.id, Number(proposalProfessionalId)),
-            eq(proposalProfessionals.professional_id, user.userId)
-          )
-        )
+            eq(proposalProfessionals.id, Number(id)),
+            eq(proposalProfessionals.professional_id, user.userId),
+          ),
+        );
 
       if (!pp) {
-        console.log('❌ Proposta profissional não encontrada')
-        return res.status(404).json({ erro: 'Registro não encontrado' })
+        console.warn(
+          "⚠️ [marcarConcluido] Proposta profissional não encontrada",
+        );
+        return res.status(404).json({ erro: "Registro não encontrado" });
       }
 
-      console.log('🔍 Atualizando proposta profissional para FINALIZADA...')
+      console.log(
+        "🔍 [marcarConcluido] Atualizando proposta profissional para FINALIZADA...",
+      );
       await db
         .update(proposalProfessionals)
-        .set({ status: 'FINALIZADA' })
-        .where(eq(proposalProfessionals.id, Number(proposalProfessionalId)))
+        .set({ status: "FINALIZADA" })
+        .where(eq(proposalProfessionals.id, Number(id)));
 
-      console.log('🔍 Atualizando proposta principal para FINALIZADA...')
+      console.log(
+        "🔍 [marcarConcluido] Atualizando serviço para FINALIZADA...",
+      );
       await db
-        .update(proposals)
-        .set({ status: 'FINALIZADA' })
-        .where(eq(proposals.id, pp.proposal_id))
+        .update(professionalServices)
+        .set({ status: "FINALIZADA" })
+        .where(eq(professionalServices.id, pp.service_id));
 
-      // Simular envio de WhatsApp para cliente
-      console.log('📱 [SIMULAÇÃO] Enviando WhatsApp para cliente para avaliar o serviço!')
-
-      res.json({ mensagem: 'Serviço marcado como concluído com sucesso' })
+      console.log(
+        "📱 [marcarConcluido] [SIMULAÇÃO] Enviando WhatsApp para cliente para avaliar o serviço!",
+      );
+      console.log("✅ [marcarConcluido] Processo concluído com sucesso!");
+      res.json({ mensagem: "Serviço marcado como concluído com sucesso" });
     } catch (error) {
-      console.error('❌ Erro ao marcar serviço como concluído:', error)
-      res.status(500).json({ erro: 'Erro interno do servidor' })
+      console.error(
+        "❌ [marcarConcluido] Erro completo ao marcar serviço como concluído:",
+        {
+          message: error instanceof Error ? error.message : "Erro desconhecido",
+          stack: error instanceof Error ? error.stack : undefined,
+          error,
+        },
+      );
+      const mensagemErro =
+        error instanceof Error
+          ? `Erro ao marcar serviço como concluído: ${error.message}`
+          : "Erro interno do servidor";
+      res.status(500).json({ erro: mensagemErro });
     }
   }
 }
