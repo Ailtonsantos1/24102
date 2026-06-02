@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -10,28 +10,30 @@ import {
 
 const API_URL = 'http://localhost:3000';
 
-const DEFAULT_AVATAR_SVG =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23c2410c'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
-
 const Profile = () => {
   const navigate = useNavigate();
   const { usuario, updateUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     nome: '',
-    profissao: '',
     bio: '',
+    profissao: '',
     experiencia: '',
-    habilidades: [] as string[],
-    fotoPerfil: null as string | null,
     localizacao: '',
+    habilidades: [] as string[],
   });
+  const [avatar, setAvatar] = useState<string | null>(null);
+  const [photoModalOpen, setPhotoModalOpen] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [newSkillInput, setNewSkillInput] = useState('');
-  const [toastMessage, setToastMessage] = useState('');
-  const [toastBgColor, setToastBgColor] = useState('#7c2d12');
-  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [toast, setToast] = useState({
+    show: false,
+    message: '',
+    isError: false,
+  });
+  const toastTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Load user data when usuario changes
   useEffect(() => {
     if (usuario) {
       const profHabilidades = usuario.perfilProfissional?.habilidades
@@ -40,72 +42,57 @@ const Profile = () => {
           : usuario.perfilProfissional.habilidades
         : [];
 
-      // Se a foto começar com /uploads/, adicionar o base URL
-      let fotoPerfil = usuario.foto || null;
-      if (fotoPerfil && fotoPerfil.startsWith('/uploads/')) {
-        fotoPerfil = `${API_URL}${fotoPerfil}`;
-      }
-
       setFormData({
         nome: usuario.nome || '',
-        profissao: usuario.perfilProfissional?.profissao || '',
         bio: usuario.bio || '',
+        profissao: usuario.perfilProfissional?.profissao || '',
         experiencia: usuario.perfilProfissional?.experiencia || '',
-        habilidades: Array.isArray(profHabilidades) ? profHabilidades : [],
-        fotoPerfil: fotoPerfil,
         localizacao: usuario.perfilProfissional?.localizacao || '',
+        habilidades: Array.isArray(profHabilidades) ? profHabilidades : [],
       });
+
+      // Se a foto começar com /uploads/, adicionar o base URL
+      let avatar = usuario.foto || null;
+      if (avatar && avatar.startsWith('/uploads/')) {
+        avatar = `${API_URL}${avatar}`;
+      }
+      setAvatar(avatar);
     }
   }, [usuario]);
 
-  const showToast = (message: string, bgColor = '#7c2d12') => {
-    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-    setToastMessage(message);
-    setToastBgColor(bgColor);
-    toastTimeoutRef.current = setTimeout(() => setToastMessage(''), 2800);
-  };
+  const displayName = formData.nome.trim() || 'Usuário';
 
-  const handleFileSelect = async (file: File) => {
-    if (!file) return;
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      showToast('Formato inválido! Use PNG, JPG ou WEBP.', '#dc2626');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      showToast('Arquivo muito grande! Máximo 5MB.', '#dc2626');
-      return;
-    }
+  const showToast = useCallback((message: string, isError = false) => {
+    if (toastTimeout.current) clearTimeout(toastTimeout.current);
+    setToast({ show: true, message, isError });
+    toastTimeout.current = setTimeout(() => {
+      setToast({ show: false, message: '', isError: false });
+    }, 3000);
+  }, []);
 
-    try {
-      const result = await uploadSingleImage(file);
-      setFormData((prev) => ({
-        ...prev,
-        fotoPerfil: `${API_URL}${result.url}`,
-      }));
-      showToast('Foto de perfil atualizada!', '#16a34a');
-    } catch (error) {
-      console.error(error);
-      const message =
-        error instanceof Error ? error.message : 'Erro ao fazer upload';
-      showToast(message, '#dc2626');
-    }
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
+  ) => {
+    const { id, value } = e.target;
+    setFormData((prev) => ({ ...prev, [id]: value }));
   };
 
   const addSkill = () => {
     const skill = newSkillInput.trim();
     if (skill === '') {
-      showToast('Digite uma habilidade!', '#c2410c');
+      showToast('Digite uma habilidade!', true);
       return;
     }
     if (
       formData.habilidades.some((s) => s.toLowerCase() === skill.toLowerCase())
     ) {
-      showToast('Essa habilidade já existe!', '#c2410c');
+      showToast('Essa habilidade já existe!', true);
       return;
     }
     if (skill.length > 50) {
-      showToast('Máximo de 50 caracteres!', '#c2410c');
+      showToast('Máximo de 50 caracteres!', true);
       return;
     }
     setFormData((prev) => ({
@@ -113,7 +100,7 @@ const Profile = () => {
       habilidades: [...prev.habilidades, skill],
     }));
     setNewSkillInput('');
-    showToast(`Habilidade "${skill}" adicionada!`, '#16a34a');
+    showToast(`Habilidade "${skill}" adicionada!`);
   };
 
   const removeSkill = (index: number) => {
@@ -122,20 +109,20 @@ const Profile = () => {
       ...prev,
       habilidades: prev.habilidades.filter((_, i) => i !== index),
     }));
-    showToast(`Habilidade "${removed}" removida!`, '#7c2d12');
+    showToast(`Habilidade "${removed}" removida!`);
   };
 
   const validateForm = () => {
     if (formData.nome.trim() === '') {
-      showToast('Digite seu nome!', '#dc2626');
+      showToast('Digite seu nome!', true);
       return false;
     }
     if (formData.nome.length < 3) {
-      showToast('Nome muito curto!', '#dc2626');
+      showToast('Nome muito curto!', true);
       return false;
     }
     if (formData.profissao.trim() === '') {
-      showToast('Informe sua profissão!', '#dc2626');
+      showToast('Informe sua profissão!', true);
       return false;
     }
     return true;
@@ -144,8 +131,7 @@ const Profile = () => {
   const saveProfile = async () => {
     if (!validateForm()) return;
     try {
-      // Strip API_URL from foto if present
-      let fotoToSave = formData.fotoPerfil;
+      let fotoToSave = formData.foto;
       if (fotoToSave && fotoToSave.startsWith(API_URL)) {
         fotoToSave = fotoToSave.substring(API_URL.length);
       }
@@ -156,371 +142,771 @@ const Profile = () => {
         foto: fotoToSave,
       });
       if (userUpdate.usuario) updateUser(userUpdate.usuario);
+
       await atualizarPerfilProfissional({
         profissao: formData.profissao.trim(),
         experiencia: formData.experiencia.trim(),
         habilidades: formData.habilidades,
         localizacao: formData.localizacao,
       });
+
       const { usuario: refreshedUser } = await obterDadosUsuario();
       if (refreshedUser) updateUser(refreshedUser);
-      showToast('✅ Perfil salvo com sucesso!', '#16a34a');
+
       setIsEditing(false);
+      showToast('✅ Perfil atualizado com sucesso!');
     } catch (error) {
       console.error(error);
-      showToast('Erro ao salvar perfil!', '#dc2626');
+      showToast('Erro ao atualizar perfil', true);
     }
   };
 
-  const cancelForm = () => {
-    if (window.confirm('Deseja realmente cancelar?')) {
-      if (usuario) {
-        const profHabilidades = usuario.perfilProfissional?.habilidades
-          ? typeof usuario.perfilProfissional.habilidades === 'string'
-            ? JSON.parse(usuario.perfilProfissional.habilidades)
-            : usuario.perfilProfissional.habilidades
-          : [];
+  const cancelChanges = () => {
+    if (usuario) {
+      const profHabilidades = usuario.perfilProfissional?.habilidades
+        ? typeof usuario.perfilProfissional.habilidades === 'string'
+          ? JSON.parse(usuario.perfilProfissional.habilidades)
+          : usuario.perfilProfissional.habilidades
+        : [];
 
-        // Se a foto começar com /uploads/, adicionar o base URL
-        let fotoPerfil = usuario.foto || null;
-        if (fotoPerfil && fotoPerfil.startsWith('/uploads/')) {
-          fotoPerfil = `${API_URL}${fotoPerfil}`;
-        }
+      setFormData({
+        nome: usuario.nome || '',
+        bio: usuario.bio || '',
+        profissao: usuario.perfilProfissional?.profissao || '',
+        experiencia: usuario.perfilProfissional?.experiencia || '',
+        localizacao: usuario.perfilProfissional?.localizacao || '',
+        habilidades: Array.isArray(profHabilidades) ? profHabilidades : [],
+      });
 
-        setFormData({
-          nome: usuario.nome || '',
-          profissao: usuario.perfilProfissional?.profissao || '',
-          bio: usuario.bio || '',
-          experiencia: usuario.perfilProfissional?.experiencia || '',
-          habilidades: Array.isArray(profHabilidades) ? profHabilidades : [],
-          fotoPerfil: fotoPerfil,
-          localizacao: usuario.perfilProfissional?.localizacao || '',
-        });
+      let avatar = usuario.foto || null;
+      if (avatar && avatar.startsWith('/uploads/')) {
+        avatar = `${API_URL}${avatar}`;
       }
-      setIsEditing(false);
-      showToast('Alterações canceladas!', '#7c2d12');
+      setAvatar(avatar);
     }
+    setIsEditing(false);
+    showToast('Alterações descartadas');
+  };
+
+  const openPhotoModal = () => {
+    setSelectedPhoto(null);
+    setPhotoModalOpen(true);
+  };
+  const closePhotoModal = () => setPhotoModalOpen(false);
+  const handlePhotoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0])
+      setSelectedPhoto(e.target.files[0]);
+  };
+  const saveProfilePhoto = async () => {
+    if (!selectedPhoto) {
+      showToast('Selecione uma foto primeiro', true);
+      return;
+    }
+
+    try {
+      const result = await uploadSingleImage(selectedPhoto);
+      const fullImageUrl = `${API_URL}${result.url}`;
+      setAvatar(fullImageUrl);
+      setFormData((prev) => ({ ...prev, foto: fullImageUrl }));
+      showToast('✅ Foto de perfil atualizada!');
+      closePhotoModal();
+    } catch (error) {
+      console.error(error);
+      const message =
+        error instanceof Error ? error.message : 'Erro ao fazer upload';
+      showToast(message, true);
+    }
+  };
+
+  const handleLogout = () => {
+    showToast('👋 Até logo! Fazendo logout...');
+    setTimeout(() => navigate('/'), 1500);
   };
 
   useEffect(() => {
     return () => {
-      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+      if (toastTimeout.current) clearTimeout(toastTimeout.current);
     };
   }, []);
 
-  const styles = `
-    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
-    body { background: #fff7ed; min-height: 100vh; }
-    .profile-card { max-width: 900px; width: 100%; background: white; border-radius: 40px; box-shadow: 0 25px 45px -12px rgba(0,0,0,0.12); overflow: hidden; margin: 32px auto; }
-    .top-nav { background: linear-gradient(135deg, #f97316, #ea580c); padding: 20px 36px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
-    .nav-buttons { display: flex; gap: 12px; flex-wrap: wrap; }
-    .nav-btn { background: rgba(255,255,255,0.25); border: none; color: white; padding: 10px 20px; border-radius: 60px; cursor: pointer; font-weight: 700; font-size: 0.9rem; transition: all 0.2s; display: flex; align-items: center; gap: 8px; }
-    .nav-btn:hover { background: rgba(255,255,255,0.35); transform: translateY(-1px); }
-    .nav-btn.active { background: white; color: #ea580c; }
-    .form-header { background: white; padding: 28px 36px 12px; border-bottom: 1px solid #ffe4c2; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
-    .form-header h1 { font-size: 1.9rem; font-weight: 800; background: linear-gradient(125deg, #7c2d12, #f97316); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -0.3px; }
-    .edit-btn { background: linear-gradient(135deg, #f97316, #ea580c); border: none; color: white; padding: 12px 24px; border-radius: 60px; cursor: pointer; font-weight: 700; transition: all 0.2s; display: flex; align-items: center; gap: 8px; }
-    .edit-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 14px rgba(249,115,22,0.3); }
-    .form-body { padding: 32px 40px 40px; }
-    .profile-photo-section { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; margin-bottom: 36px; background: #fff7ed; padding: 24px 28px; border-radius: 30px; border: 1px solid #fed7aa; }
-    .photo-container { display: flex; flex-direction: column; align-items: center; gap: 14px; }
-    .avatar-preview { width: 130px; height: 130px; border-radius: 50%; object-fit: cover; background: #fed7aa; border: 4px solid white; box-shadow: 0 8px 20px rgba(0,0,0,0.12); }
-    .avatar-placeholder { width: 130px; height: 130px; border-radius: 50%; background: linear-gradient(145deg, #fed7aa, #f97316); display: flex; align-items: center; justify-content: center; font-size: 4rem; color: #fff7ed; border: 4px solid white; box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
-    .photo-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
-    .btn-photo { background: #fed7aa; border: none; padding: 10px 20px; border-radius: 60px; font-size: 0.9rem; font-weight: 700; color: #7c2d12; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 8px; }
-    .btn-photo:hover { background: #fdba74; transform: translateY(-1px); }
-    .btn-photo-danger { color: #dc2626; background: #fee2e2; }
-    .btn-photo-danger:hover { background: #fca5a5; }
-    .photo-info { color: #7c2d12; font-size: 0.95rem; max-width: 320px; line-height: 1.6; }
-    .form-section { margin-bottom: 34px; }
-    .section-title { font-size: 1.45rem; font-weight: 800; color: #7c2d12; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
-    .field-group { margin-bottom: 24px; }
-    label { font-weight: 700; color: #7c2d12; display: block; margin-bottom: 10px; font-size: 1rem; }
-    .label-hint { font-weight: 600; color: #c2410c; font-size: 0.85rem; margin-left: 8px; }
-    input, textarea, select { width: 100%; padding: 15px 20px; border: 1.5px solid ${isEditing ? '#fed7aa' : '#ffe4c2'}; border-radius: 22px; font-size: 1rem; font-family: inherit; background: ${isEditing ? '#ffffff' : '#fffbeb'}; transition: all 0.2s; outline: none; color: #431407; cursor: ${isEditing ? 'text' : 'default'}; }
-    input:focus, textarea:focus, select:focus { border-color: #f97316; box-shadow: 0 0 0 4px rgba(249,115,22,0.15); background: white; }
-    textarea { resize: vertical; min-height: 110px; }
-    .skills-area { background: #fff7ed; border-radius: 28px; padding: 24px; border: 1px solid #fed7aa; }
-    .skills-list { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0 20px; align-items: center; }
-    .skill-tag { background: #ffedd5; color: #7c2d12; padding: 9px 20px; border-radius: 60px; font-size: 0.95rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); transition: all 0.2s; border: 1px solid #fed7aa; }
-    .skill-tag button { background: none; border: none; font-size: 1.35rem; cursor: pointer; color: #ea580c; font-weight: 700; padding: 0 6px; transition: color 0.2s; display: inline-flex; align-items: center; }
-    .skill-tag button:hover { color: #dc2626; }
-    .add-skill { display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
-    .add-skill input { flex: 2; min-width: 200px; padding: 13px 18px; border-radius: 60px; }
-    .btn-add-skill { background: linear-gradient(135deg, #f97316, #ea580c); border: none; padding: 13px 26px; border-radius: 60px; font-weight: 800; color: white; cursor: pointer; transition: all 0.2s; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; }
-    .btn-add-skill:hover { transform: translateY(-2px); box-shadow: 0 6px 14px rgba(249,115,22,0.3); }
-    .action-buttons { display: flex; justify-content: flex-end; gap: 16px; margin-top: 40px; padding-top: 22px; border-top: 1px solid #ffe4c2; }
-    .btn-cancel, .btn-save { padding: 14px 32px; border-radius: 60px; font-weight: 800; font-size: 1rem; cursor: pointer; transition: all 0.2s; border: none; font-family: inherit; display: flex; align-items: center; gap: 8px; }
-    .btn-cancel { background: #fed7aa; color: #7c2d12; border: 1px solid #fdba74; }
-    .btn-cancel:hover { background: #fdba74; color: #431407; transform: translateY(-1px); }
-    .btn-save { background: linear-gradient(95deg, #ea580c, #f97316); color: white; box-shadow: 0 4px 14px rgba(249,115,22,0.25); }
-    .btn-save:hover { background: linear-gradient(95deg, #c2410c, #ea580c); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(249,115,22,0.35); }
-    .toast-message { position: fixed; top: 24px; right: 24px; color: white; padding: 14px 26px; border-radius: 60px; font-weight: 700; z-index: 9999; background: rgba(124,45,18,0.95); font-size: 0.95rem; transition: all 0.2s; box-shadow: 0 6px 18px rgba(0,0,0,0.15); animation: fadeIn 0.2s ease; }
-    @keyframes fadeIn { from { opacity:0; transform: translateY(-8px); } to { opacity:1; transform: translateY(0); } }
-    @media (max-width: 768px) {
-      .top-nav { padding: 18px 20px; }
-      .form-body { padding: 22px 20px 32px; }
-      .form-header { padding: 22px 20px 12px; }
-      .profile-photo-section { justify-content: center; text-align: center; flex-direction: column; padding: 22px 20px; }
-      .action-buttons { flex-direction: column-reverse; }
-      .btn-cancel, .btn-save { width: 100%; justify-content: center; }
-      .section-title { font-size: 1.25rem; }
-      .avatar-preview, .avatar-placeholder { width: 110px; height: 110px; font-size: 3.2rem; }
-    }
-    .file-input-hidden { display: none; }
-  `;
+  const styles = ` * {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+body {
+  font-family: 'Inter', sans-serif;
+  background: #fff7ed;
+  color: #1e293b;
+  min-height: 100vh;
+}
+.profile-container {
+  width: 100%;
+  min-height: 100vh;
+}
+.user-header {
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  color: #fff;
+  padding: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.user-info h2 {
+  font-size: 28px;
+  margin-bottom: 6px;
+}
+.user-info p {
+  opacity: 0.9;
+}
+.user-actions {
+  display: flex;
+  gap: 10px;
+}
+.icon-btn {
+  width: 45px;
+  height: 45px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  cursor: pointer;
+  transition: 0.3s;
+  font-size: 16px;
+}
+.icon-btn:hover {
+  background: #fff;
+  color: #ea580c;
+}
+.profile-card {
+  max-width: 950px;
+  margin: 30px auto;
+  background: #fff;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.08);
+}
+.profile-header {
+  padding: 35px;
+  text-align: center;
+  background: #eff6ff;
+  background: #fff7ed;
+  position: relative;
+}
+.edit-profile-link {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  border: none;
+  background: ${isEditing ? '#dc2626' : '#f97316'};
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: 0.3s;
+  font-weight: 600;
+}
+.edit-profile-link:hover {
+  background: ${isEditing ? '#b91c1c' : '#ea580c'};
+}
+.profile-avatar {
+  width: 130px;
+  height: 130px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  overflow: hidden;
+  position: relative;
+  background: #fed7aa;
+  border: 4px solid #fff;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+}
+.avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 60px;
+  color: #7c2d12;
+}
+.avatar-overlay {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  text-align: center;
+  padding: 10px;
+  cursor: pointer;
+  opacity: 0;
+  transition: 0.3s;
+}
+.profile-avatar:hover .avatar-overlay {
+  opacity: 1;
+}
+.profile-header h3 {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+.user-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff7ed;
+  background: #ffedd5;
+  color: #7c2d12;
+  padding: 10px 16px;
+  border-radius: 30px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.form-section {
+  padding: 30px;
+  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid #ffe4c2;
+}
+.form-section h4 {
+  margin-bottom: 24px;
+  font-size: 20px;
+  color: #0f172a;
+  color: #7c2d12;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.form-group {
+  margin-bottom: 22px;
+}
+.form-group label {
+  display: block;
+  margin-bottom: 10px;
+  font-weight: 600;
+  color: #334155;
+  color: #7c2d12;
+}
+input, textarea, select {
+  width: 100%;
+  padding: 14px;
+  border: 1px solid ${isEditing ? '#cbd5e1' : '#e2e8f0'};
+  border: 1px solid ${isEditing ? '#fed7aa' : '#ffe4c2'};
+  border-radius: 14px;
+  font-size: 15px;
+  background: ${isEditing ? '#fff' : '#f8fafc'};
+  background: ${isEditing ? '#ffffff' : '#fffbeb'};
+  transition: 0.3s;
+  cursor: ${isEditing ? 'text' : 'default'};
+  color: #431407;
+}
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: #2563eb;
+  border-color: #f97316;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
+  box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.15);
+}
+textarea {
+  min-height: 130px;
+  resize: vertical;
+}
+.double-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.hint-text {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #64748b;
+  color: #9a3412;
+}
+.skills-area {
+  background: #fff7ed;
+  border-radius: 20px;
+  padding: 20px;
+  border: 1px solid #fed7aa;
+}
+.skills-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.skill-tag {
+  background: #ffedd5;
+  color: #7c2d12;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #fed7aa;
+}
+.skill-tag button {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #ea580c;
+  font-weight: 700;
+  padding: 0 4px;
+  transition: color 0.2s;
+}
+.skill-tag button:hover {
+  color: #dc2626;
+}
+.add-skill {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.add-skill input {
+  flex: 2;
+  min-width: 200px;
+}
+.btn-add-skill {
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  border: none;
+  padding: 14px 20px;
+  border-radius: 14px;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+  transition: 0.3s;
+}
+.btn-add-skill:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(249,115,22,0.3);
+}
+.action-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 14px;
+  padding: 30px;
+}
+.btn-cancel, .btn-save {
+  border: none;
+  padding: 14px 28px;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.3s;
+}
+.btn-cancel {
+  background: #e2e8f0;
+  background: #fed7aa;
+  color: #334155;
+  color: #7c2d12;
+}
+.btn-cancel:hover {
+  background: #cbd5e1;
+  background: #fdba74;
+}
+.btn-save {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  color: #fff;
+}
+.btn-save:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 8px 20px rgba(249, 115, 22, 0.35);
+}
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: #fff;
+  display: flex;
+  justify-content: space-around;
+  padding: 12px 0;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
+  z-index: 100;
+}
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: #64748b;
+  cursor: pointer;
+  transition: 0.3s;
+  font-size: 13px;
+}
+.nav-item i {
+  font-size: 18px;
+}
+.nav-item.active, .nav-item:hover {
+  color: #2563eb;
+  color: #f97316;
+}
+.footer {
+  background: #0f172a;
+  color: #fff;
+  margin-top: 60px;
+  padding: 50px 20px 120px;
+}
+.footer-content {
+  max-width: 1200px;
+  margin: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 30px;
+}
+.footer-col h4 {
+  margin-bottom: 18px;
+}
+.footer-col p, .footer-col a {
+  color: #cbd5e1;
+  font-size: 14px;
+  margin-bottom: 10px;
+  display: block;
+  text-decoration: none;
+}
+.footer-col a:hover {
+  color: #fff;
+}
+.social-links {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+.social-links a {
+  width: 38px;
+  height: 38px;
+  background: #1e293b;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: 0.3s;
+}
+.social-links a:hover {
+  background: #2563eb;
+  background: #f97316;
+}
+.footer-bottom {
+  text-align: center;
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  font-size: 13px;
+  color: #94a3b8;
+}
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+.modal.active {
+  display: flex;
+}
+.modal-content {
+  background: #fff;
+  padding: 30px;
+  border-radius: 20px;
+  width: 90%;
+  max-width: 400px;
+  text-align: center;
+}
+.modal-content h4 {
+  margin-bottom: 12px;
+}
+.modal-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+.success-toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  color: #fff;
+  padding: 16px 20px;
+  border-radius: 14px;
+  z-index: 9999;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.15);
+  transition: 0.3s;
+}
+@media (max-width: 768px) {
+  .double-row {
+    grid-template-columns: 1fr;
+  }
+  .profile-header {
+    padding-top: 70px;
+  }
+  .edit-profile-link {
+    top: 16px;
+    right: 16px;
+  }
+  .action-buttons {
+    flex-direction: column;
+  }
+  .btn-cancel, .btn-save {
+    width: 100%;
+  }
+  .footer {
+    padding-bottom: 140px;
+  }
+  .add-skill {
+    flex-direction: column;
+  }
+  .add-skill input, .btn-add-skill {
+    width: 100%;
+  }
+} `;
 
   return (
     <>
       <style>{styles}</style>
-      <div
-        style={{
-          background: '#fff7ed',
-          minHeight: '100vh',
-          paddingBottom: '40px',
-        }}
-      >
-        <div className="profile-card">
-          <div className="form-header">
-            <div>
-              <h1>⚙️ Meu Perfil Profissional</h1>
-              <p
-                style={{
-                  color: '#9a3412',
-                  marginTop: '6px',
-                  fontWeight: '600',
-                  fontSize: '0.95rem',
-                }}
-              >
-                Mantenha seus dados atualizados!
-              </p>
-            </div>
+      <div className="profile-container">
+        <div className="user-header">
+          <div className="user-info">
+            <h2>Meu Perfil</h2>
+            <p>Gerencie suas informações profissionais</p>
+          </div>
+          <div className="user-actions">
             <button
-              className="edit-btn"
-              onClick={() => (isEditing ? cancelForm() : setIsEditing(true))}
+              className="icon-btn"
+              onClick={() => navigate('/professional/proposals')}
             >
-              <i className="fas fa-pen"></i>
-              {isEditing ? ' Cancelar' : ' Editar Perfil'}
+              <i className="fas fa-bell"></i>
+            </button>
+            <button
+              className="icon-btn"
+              onClick={() => navigate('/professional/home')}
+            >
+              <i className="fas fa-home"></i>
+            </button>
+            <button className="icon-btn" onClick={handleLogout}>
+              <i className="fas fa-sign-out-alt"></i>
             </button>
           </div>
-          <div className="form-body">
-            <div className="profile-photo-section">
-              <div className="photo-container">
-                {formData.fotoPerfil ? (
-                  <img
-                    className="avatar-preview"
-                    src={formData.fotoPerfil}
-                    alt="Foto de perfil"
-                  />
-                ) : (
-                  <div className="avatar-placeholder">👤</div>
-                )}
-                {isEditing && (
-                  <>
-                    <div className="photo-actions">
-                      <button
-                        className="btn-photo"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        📷 Escolher Foto
-                      </button>
-                      {formData.fotoPerfil && (
-                        <button
-                          className="btn-photo btn-photo-danger"
-                          onClick={() => {
-                            setFormData((prev) => ({
-                              ...prev,
-                              fotoPerfil: null,
-                            }));
-                            showToast('Foto removida!', '#7c2d12');
-                          }}
-                        >
-                          🗑️ Remover
-                        </button>
-                      )}
-                    </div>
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      className="file-input-hidden"
-                      accept="image/jpeg, image/png, image/jpg, image/webp"
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files.length > 0)
-                          handleFileSelect(e.target.files[0]);
-                      }}
-                    />
-                  </>
-                )}
-              </div>
-              <div className="photo-info">
-                ⭐ Adicione uma foto profissional para se destacar!
-                <br />
-                Clientes confiam mais em perfis com foto (PNG, JPG até 5MB)
-              </div>
-            </div>
+        </div>
 
-            <div className="form-section">
-              <div className="section-title">📝 Dados Básicos</div>
-              <div className="field-group">
-                <label>
-                  Nome Completo{' '}
-                  <span className="label-hint">(obrigatório)</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ex: José da Silva"
-                  value={formData.nome}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, nome: e.target.value }))
-                  }
-                  disabled={!isEditing}
-                />
-              </div>
-              <div className="field-group">
-                <label>
-                  Profissão / Área{' '}
-                  <span className="label-hint">(obrigatório)</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ex: Eletricista, Pedreiro, Pintor"
-                  value={formData.profissao}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      profissao: e.target.value,
-                    }))
-                  }
-                  disabled={!isEditing}
-                />
-              </div>
-            </div>
-
-            <div className="form-section">
-              <div className="section-title">✨ Sobre Você</div>
-              <div className="field-group">
-                <textarea
-                  rows={4}
-                  placeholder="Conte um pouco sobre sua experiência e valores..."
-                  value={formData.bio}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, bio: e.target.value }))
-                  }
-                  disabled={!isEditing}
-                />
-              </div>
-            </div>
-
-            <div className="form-section">
-              <div className="section-title">💼 Experiência</div>
-              <div className="field-group">
-                <textarea
-                  rows={3}
-                  placeholder="Descreva sua experiência profissional..."
-                  value={formData.experiencia}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      experiencia: e.target.value,
-                    }))
-                  }
-                  disabled={!isEditing}
-                />
-              </div>
-            </div>
-
-            <div className="form-section">
-              <div className="section-title">📍 Localização</div>
-              <div className="field-group">
-                <input
-                  type="text"
-                  placeholder="Ex: São Paulo - SP"
-                  value={formData.localizacao}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      localizacao: e.target.value,
-                    }))
-                  }
-                  disabled={!isEditing}
-                />
-              </div>
-            </div>
-
-            <div className="form-section">
-              <div className="section-title">🛠️ Habilidades</div>
-              <div className="skills-area">
-                <div className="skills-list">
-                  {formData.habilidades.length === 0 && !isEditing && (
-                    <div style={{ color: '#9a3412', padding: '10px 0' }}>
-                      Nenhuma habilidade cadastrada ainda
-                    </div>
-                  )}
-                  {formData.habilidades.map((skill, idx) => (
-                    <div className="skill-tag" key={idx}>
-                      {skill}
-                      {isEditing && (
-                        <button onClick={() => removeSkill(idx)}>✕</button>
-                      )}
-                    </div>
-                  ))}
+        <div className="profile-card">
+          <div className="profile-header">
+            <button
+              className="edit-profile-link"
+              onClick={() => (isEditing ? cancelChanges() : setIsEditing(true))}
+            >
+              <i className="fas fa-pen"></i>{' '}
+              {isEditing ? 'Cancelar' : 'Editar perfil'}
+            </button>
+            <div className="profile-avatar">
+              {avatar ? (
+                <img className="avatar-image" src={avatar} alt="Avatar" />
+              ) : (
+                <div className="avatar-placeholder">
+                  <i className="fas fa-user-circle"></i>
                 </div>
-                {isEditing && (
-                  <>
-                    <div className="add-skill">
-                      <input
-                        type="text"
-                        placeholder="Adicione uma nova habilidade"
-                        value={newSkillInput}
-                        onChange={(e) => setNewSkillInput(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && addSkill()}
-                      />
-                      <button className="btn-add-skill" onClick={addSkill}>
-                        <i className="fas fa-plus"></i> Adicionar
-                      </button>
-                    </div>
-                    <div
-                      style={{
-                        marginTop: '16px',
-                        color: '#9a3412',
-                        fontSize: '0.85rem',
-                      }}
-                    >
-                      💡 Ex: Instalação elétrica, Manutenção corretiva,
-                      Atendimento ao cliente
-                    </div>
-                  </>
-                )}
+              )}
+              {isEditing && (
+                <div className="avatar-overlay" onClick={openPhotoModal}>
+                  <i className="fas fa-camera"></i>
+                </div>
+              )}
+            </div>
+            <h3>{displayName}</h3>
+            <div className="user-type">
+              <i className="fas fa-briefcase"></i> <span>Profissional</span>
+            </div>
+          </div>
+
+          <div className="form-section">
+            <h4>
+              <i className="fas fa-user-edit"></i> Informações Pessoais
+            </h4>
+            <div className="double-row">
+              <div className="form-group">
+                <label>Nome completo</label>
+                <input
+                  type="text"
+                  id="nome"
+                  value={formData.nome}
+                  onChange={handleChange}
+                  disabled={!isEditing}
+                />
+              </div>
+              <div className="form-group">
+                <label>Profissão</label>
+                <input
+                  type="text"
+                  id="profissao"
+                  value={formData.profissao}
+                  onChange={handleChange}
+                  disabled={!isEditing}
+                  placeholder="Ex: Eletricista, Pedreiro"
+                />
               </div>
             </div>
-
-            {isEditing && (
-              <div className="action-buttons">
-                <button className="btn-cancel" onClick={cancelForm}>
-                  <i className="fas fa-times"></i> Cancelar
-                </button>
-                <button className="btn-save" onClick={saveProfile}>
-                  <i className="fas fa-check"></i> Salvar Perfil
-                </button>
+            <div className="double-row">
+              <div className="form-group">
+                <label>Localização</label>
+                <input
+                  type="text"
+                  id="localizacao"
+                  value={formData.localizacao}
+                  onChange={handleChange}
+                  disabled={!isEditing}
+                  placeholder="Ex: São Paulo - SP"
+                />
               </div>
-            )}
+            </div>
+          </div>
+
+          <div className="form-section">
+            <h4>
+              <i className="fas fa-address-card"></i> Sobre mim
+            </h4>
+            <div className="form-group">
+              <label>Biografia</label>
+              <textarea
+                id="bio"
+                value={formData.bio}
+                onChange={handleChange}
+                disabled={!isEditing}
+                placeholder="Conte um pouco sobre sua experiência e valores"
+              />
+            </div>
+          </div>
+
+          <div className="form-section">
+            <h4>
+              <i className="fas fa-briefcase"></i> Experiência
+            </h4>
+            <div className="form-group">
+              <label>Descrição da experiência</label>
+              <textarea
+                id="experiencia"
+                value={formData.experiencia}
+                onChange={handleChange}
+                disabled={!isEditing}
+                placeholder="Descreva sua experiência profissional"
+              />
+            </div>
+          </div>
+
+          <div className="form-section">
+            <h4>
+              <i className="fas fa-tools"></i> Habilidades
+            </h4>
+            <div className="skills-area">
+              <div className="skills-list">
+                {formData.habilidades.length === 0 && !isEditing && (
+                  <div style={{ color: '#9a3412', padding: '8px 0' }}>
+                    Nenhuma habilidade cadastrada
+                  </div>
+                )}
+                {formData.habilidades.map((skill, index) => (
+                  <div className="skill-tag" key={index}>
+                    {skill}
+                    {isEditing && (
+                      <button onClick={() => removeSkill(index)}>×</button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {isEditing && (
+                <div className="add-skill">
+                  <input
+                    type="text"
+                    placeholder="Adicionar nova habilidade"
+                    value={newSkillInput}
+                    onChange={(e) => setNewSkillInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && addSkill()}
+                  />
+                  <button className="btn-add-skill" onClick={addSkill}>
+                    <i className="fas fa-plus"></i> Adicionar
+                  </button>
+                </div>
+              )}
+              <div className="hint-text">
+                💡 Ex: Instalação elétrica, Manutenção corretiva, Atendimento ao
+                cliente
+              </div>
+            </div>
+          </div>
+
+          {isEditing && (
+            <div className="action-buttons">
+              <button className="btn-cancel" onClick={cancelChanges}>
+                Cancelar
+              </button>
+              <button className="btn-save" onClick={saveProfile}>
+                Salvar alterações
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="footer"></div>
+
+        <div
+          className={`modal ${photoModalOpen ? 'active' : ''}`}
+          onClick={closePhotoModal}
+        >
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h4>
+              <i className="fas fa-camera"></i> Adicionar foto de perfil
+            </h4>
+            <p>Escolha uma foto para seu perfil</p>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/jpg,image/webp"
+              onChange={handlePhotoFileChange}
+              style={{ margin: '1rem 0' }}
+            />
+            <div className="modal-buttons">
+              <button
+                className="btn-cancel"
+                style={{ background: '#fed7aa', color: '#7c2d12' }}
+                onClick={closePhotoModal}
+              >
+                Cancelar
+              </button>
+              <button className="btn-save" onClick={saveProfilePhoto}>
+                Salvar foto
+              </button>
+            </div>
           </div>
         </div>
+
+        {toast.show && (
+          <div
+            className="success-toast"
+            style={{ background: toast.isError ? '#dc2626' : '#f97316' }}
+          >
+            <i
+              className={`fas ${toast.isError ? 'fa-exclamation-triangle' : 'fa-check-circle'}`}
+            ></i>{' '}
+            {toast.message}
+          </div>
+        )}
       </div>
 
-      {toastMessage && (
-        <div className="toast-message" style={{ background: toastBgColor }}>
-          {toastMessage}
-        </div>
-      )}
-
       <link
+        href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap"
         rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
       />
       <link
-        href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
       />
     </>
   );
