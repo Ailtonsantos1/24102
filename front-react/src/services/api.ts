@@ -252,6 +252,114 @@ export async function listarTodosServicos(params?: {
   return res.json();
 }
 
+export async function obterServicoPorId(id: number | string) {
+  const res = await fetch(`${API_URL}/client/services/${id}`, {
+    method: 'GET',
+    credentials: 'include',
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.erro ?? 'Erro ao obter serviço');
+  return json;
+}
+
+function conversationBase(isProfessional: boolean) {
+  return isProfessional ? '/professionals' : '/client';
+}
+
+export async function iniciarConversa(serviceId: number) {
+  const res = await fetch(`${API_URL}/professionals/conversations`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ service_id: serviceId }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.erro ?? 'Erro ao iniciar conversa');
+  return json;
+}
+
+export async function listarConversas(isProfessional: boolean) {
+  const res = await fetch(
+    `${API_URL}${conversationBase(isProfessional)}/conversations`,
+    { method: 'GET', credentials: 'include' },
+  );
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.erro ?? 'Erro ao listar conversas');
+  return json;
+}
+
+export async function obterConversa(
+  id: number | string,
+  isProfessional: boolean,
+) {
+  const res = await fetch(
+    `${API_URL}${conversationBase(isProfessional)}/conversations/${id}`,
+    { method: 'GET', credentials: 'include' },
+  );
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.erro ?? 'Erro ao obter conversa');
+  return json;
+}
+
+export async function enviarMensagemChat(
+  conversationId: number | string,
+  data: {
+    conteudo: string;
+    tipo?: string;
+    metadata?: Record<string, unknown>;
+  },
+  isProfessional: boolean,
+) {
+  const res = await fetch(
+    `${API_URL}${conversationBase(isProfessional)}/conversations/${conversationId}/messages`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(data),
+    },
+  );
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.erro ?? 'Erro ao enviar mensagem');
+  return json;
+}
+
+export async function contratarProfissional(conversationId: number | string) {
+  const res = await fetch(
+    `${API_URL}/client/conversations/${conversationId}/contratar`,
+    { method: 'PATCH', credentials: 'include' },
+  );
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.erro ?? 'Erro ao contratar');
+  return json;
+}
+
+export async function concluirConversa(
+  conversationId: number | string,
+  isProfessional: boolean,
+) {
+  const res = await fetch(
+    `${API_URL}${conversationBase(isProfessional)}/conversations/${conversationId}/concluir`,
+    { method: 'PATCH', credentials: 'include' },
+  );
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.erro ?? 'Erro ao concluir');
+  return json;
+}
+
+export async function conversaPorServico(
+  serviceId: number | string,
+  isProfessional: boolean,
+) {
+  const res = await fetch(
+    `${API_URL}${conversationBase(isProfessional)}/conversations/service/${serviceId}`,
+    { method: 'GET', credentials: 'include' },
+  );
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.erro ?? 'Erro ao buscar conversa');
+  return json;
+}
+
 export async function listarPropostasRecebidas() {
   const res = await fetch(`${API_URL}/client/proposals/received`, {
     method: 'GET',
@@ -436,7 +544,7 @@ export async function criarAvaliacao(data: Record<string, unknown>) {
 }
 
 export async function criarAvaliacaoProfissional(data: Record<string, unknown>) {
-  const res = await fetch(`${API_URL}/professional/ratings`, {
+  const res = await fetch(`${API_URL}/professionals/ratings`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
@@ -461,7 +569,7 @@ export async function listarAvaliacoesPorProfissional(id: number | string) {
 // ==========================================
 
 export async function toggleFavoriteUser(userId: number, isProfessional: boolean = false) {
-  const endpoint = isProfessional ? '/professional/favorites/users' : '/client/favorites/users';
+  const endpoint = isProfessional ? '/professionals/favorites/users' : '/client/favorites/users';
   const res = await fetch(`${API_URL}${endpoint}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -472,7 +580,7 @@ export async function toggleFavoriteUser(userId: number, isProfessional: boolean
 }
 
 export async function checkFavoriteUser(userId: number, isProfessional: boolean = false) {
-  const endpoint = isProfessional ? `/professional/favorites/users/check/${userId}` : `/client/favorites/users/check/${userId}`;
+  const endpoint = isProfessional ? `/professionals/favorites/users/check/${userId}` : `/client/favorites/users/check/${userId}`;
   const res = await fetch(`${API_URL}${endpoint}`, {
     method: 'GET',
     credentials: 'include',
@@ -485,7 +593,7 @@ export async function listFavoriteUsers(
   params?: { search?: string; limit?: string },
 ) {
   const endpoint = isProfessional
-    ? '/professional/favorites/users'
+    ? '/professionals/favorites/users'
     : '/client/favorites/users';
   const query: Record<string, string> = {};
   if (params?.search) query.search = params.search;
@@ -503,7 +611,7 @@ export async function listFavoriteUsers(
 }
 
 export async function toggleFavoriteService(serviceId: number, isProfessional: boolean = false) {
-  const endpoint = isProfessional ? '/professional/favorites/services' : '/client/favorites/services';
+  const endpoint = isProfessional ? '/professionals/favorites/services' : '/client/favorites/services';
   const res = await fetch(`${API_URL}${endpoint}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -514,7 +622,7 @@ export async function toggleFavoriteService(serviceId: number, isProfessional: b
 }
 
 export async function checkFavoriteService(serviceId: number, isProfessional: boolean = false) {
-  const endpoint = isProfessional ? `/professional/favorites/services/check/${serviceId}` : `/client/favorites/services/check/${serviceId}`;
+  const endpoint = isProfessional ? `/professionals/favorites/services/check/${serviceId}` : `/client/favorites/services/check/${serviceId}`;
   const res = await fetch(`${API_URL}${endpoint}`, {
     method: 'GET',
     credentials: 'include',
@@ -527,7 +635,7 @@ export async function listFavoriteServices(
   params?: { search?: string; limit?: string },
 ) {
   const endpoint = isProfessional
-    ? '/professional/favorites/services'
+    ? '/professionals/favorites/services'
     : '/client/favorites/services';
   const query: Record<string, string> = {};
   if (params?.search) query.search = params.search;

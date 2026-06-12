@@ -3,6 +3,7 @@ import { ServiceController } from "../../controllers/client/ServiceController.js
 import { ProposalClientController } from "../../controllers/client/ProposalController.js";
 import { RatingController } from "../../controllers/client/ratingController.js";
 import { FavoritesController } from "../../controllers/FavoritesController.js";
+import { ConversationController } from "../../controllers/ConversationController.js";
 import { authenticateToken } from "../../middleware/authMiddleware.js";
 
 const router = Router();
@@ -11,6 +12,30 @@ const router = Router();
 router.post("/services", authenticateToken, ServiceController.criar);
 router.get("/services", authenticateToken, ServiceController.listarMeus);
 router.get("/services/all", authenticateToken, ServiceController.listarTodos);
+router.get("/services/:id", authenticateToken, ServiceController.obterPorId);
+
+router.get("/conversations", authenticateToken, ConversationController.listar);
+router.get(
+  "/conversations/service/:serviceId",
+  authenticateToken,
+  ConversationController.porServico,
+);
+router.get("/conversations/:id", authenticateToken, ConversationController.obter);
+router.post(
+  "/conversations/:id/messages",
+  authenticateToken,
+  ConversationController.enviarMensagem,
+);
+router.patch(
+  "/conversations/:id/contratar",
+  authenticateToken,
+  ConversationController.contratar,
+);
+router.patch(
+  "/conversations/:id/concluir",
+  authenticateToken,
+  ConversationController.concluir,
+);
 
 // Rotas de propostas recebidas
 router.get(

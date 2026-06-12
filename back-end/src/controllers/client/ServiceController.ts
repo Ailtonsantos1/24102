@@ -15,16 +15,38 @@ export class ServiceController {
         .json({ erro: "Apenas clientes podem criar serviços" });
     }
 
+    const body = req.body;
     const {
       titulo,
       descricao,
       categoria,
+      subcategoria,
+      objetivo,
       preco,
+      valor_minimo,
+      valor_maximo,
+      orcamento_definido,
+      aceita_propostas,
       urgente,
+      urgencia_nivel,
+      data_inicio_desejada,
+      data_limite,
+      tipo_atendimento,
       contato,
+      nome_contratante,
+      telefone,
+      whatsapp,
+      email_contato,
       localizacao,
+      endereco,
+      cidade,
+      estado,
+      cep,
+      referencia_local,
       fotos,
-    } = req.body;
+      anexos,
+      detalhes,
+    } = body;
 
     try {
       // Check max 3 pending services per client
@@ -44,6 +66,10 @@ export class ServiceController {
         });
       }
 
+      const localizacaoFinal =
+        localizacao ||
+        (cidade && estado ? `${cidade} - ${estado}` : cidade || endereco);
+
       const [servico] = await db
         .insert(professionalServices)
         .values({
@@ -51,11 +77,33 @@ export class ServiceController {
           titulo,
           descricao,
           categoria,
+          subcategoria,
+          objetivo,
           preco: preco ? Number(preco) : null,
-          urgente: urgente ? 1 : 0,
-          contato,
-          localizacao,
+          valor_minimo: valor_minimo ? Number(valor_minimo) : null,
+          valor_maximo: valor_maximo ? Number(valor_maximo) : null,
+          orcamento_definido: orcamento_definido ? 1 : 0,
+          aceita_propostas: aceita_propostas === false ? 0 : 1,
+          urgente: (urgente || urgencia_nivel === "24h") ? 1 : 0,
+          urgencia_nivel,
+          data_inicio_desejada,
+          data_limite,
+          tipo_atendimento,
+          contato: contato || telefone || whatsapp,
+          nome_contratante,
+          telefone,
+          whatsapp,
+          email_contato,
+          localizacao: localizacaoFinal,
+          endereco,
+          cidade,
+          estado,
+          cep,
+          referencia_local,
           fotos: fotos ? JSON.stringify(fotos) : null,
+          anexos: anexos ? JSON.stringify(anexos) : null,
+          detalhes: detalhes ? JSON.stringify(detalhes) : null,
+          status_solicitacao: "AGUARDANDO_PROPOSTAS",
           status: "PENDENTE",
         })
         .returning();
@@ -110,6 +158,37 @@ export class ServiceController {
       res.json({ servicos });
     } catch (error) {
       console.error("❌ Erro ao listar serviços:", error);
+      res.status(500).json({ erro: "Erro interno do servidor" });
+    }
+  }
+
+  static async obterPorId(req: Request, res: Response) {
+    const { id } = req.params;
+
+    try {
+      const [servico] = await db
+        .select({
+          servico: professionalServices,
+          cliente_nome: users.nome,
+          cliente_foto: users.foto,
+          cliente_cidade: users.cidade,
+        })
+        .from(professionalServices)
+        .innerJoin(users, eq(professionalServices.client_id, users.id))
+        .where(eq(professionalServices.id, Number(id)));
+
+      if (!servico) {
+        return res.status(404).json({ erro: "Serviço não encontrado" });
+      }
+
+      res.json({
+        ...servico.servico,
+        cliente_nome: servico.cliente_nome,
+        cliente_foto: servico.cliente_foto,
+        cliente_cidade: servico.cliente_cidade,
+      });
+    } catch (error) {
+      console.error(error);
       res.status(500).json({ erro: "Erro interno do servidor" });
     }
   }

@@ -7,6 +7,7 @@ import NotFound from './pages/NotFound';
 import ClientHome from './pages/client/Home';
 import ClientServices from './pages/client/Services';
 import ClientProposals from './pages/client/Proposals';
+import Messages from './pages/Messages';
 import ClientProfile from './pages/client/Profile';
 import ClientPostService from './pages/client/PostService';
 import LoginClient from './pages/client/LoginClient';
@@ -72,6 +73,14 @@ function App() {
           }
         />
         <Route
+          path="/client/messages"
+          element={
+            <ProtectedRoute allowedType="CLIENTE">
+              <Messages userType="CLIENTE" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/client/profile"
           element={
             <ProtectedRoute allowedType="CLIENTE">
@@ -106,6 +115,14 @@ function App() {
           element={
             <ProtectedRoute allowedType="PROFISSIONAL">
               <ProfessionalProposals />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/professional/messages"
+          element={
+            <ProtectedRoute allowedType="PROFISSIONAL">
+              <Messages userType="PROFISSIONAL" />
             </ProtectedRoute>
           }
         />

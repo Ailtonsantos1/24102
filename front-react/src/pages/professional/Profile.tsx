@@ -683,7 +683,7 @@ textarea {
           <div className="user-actions">
             <button
               className="icon-btn"
-              onClick={() => navigate('/professional/proposals')}
+              onClick={() => navigate('/professional/messages')}
             >
               <i className="fas fa-bell"></i>
             </button>

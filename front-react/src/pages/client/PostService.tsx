@@ -3,20 +3,42 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Toast } from '../../components/Toast';
 import { criarServico, uploadMultipleImages } from '../../services/api';
+import {
+  CATEGORIAS_SERVICO,
+  SUBCATEGORIAS,
+  URGENCIA_OPCOES,
+  TIPO_ATENDIMENTO,
+  TAMANHO_PROJETO,
+  TIPO_PROFISSIONAL,
+  MELHOR_CONTATO,
+  ESTADOS_BR,
+  type ServiceDetalhes,
+} from '../../lib/serviceOptions';
 
 interface FormData {
   titulo: string;
   descricao: string;
   categoria: string;
-  preco: number;
-  urgente: boolean;
-  contato: string;
-  localizacao: string;
-}
-
-interface ToastState {
-  message: string;
-  isError: boolean;
+  subcategoria: string;
+  objetivo: string;
+  urgencia_nivel: string;
+  data_inicio_desejada: string;
+  data_limite: string;
+  tipo_atendimento: string;
+  orcamento_definido: boolean;
+  valor_minimo: string;
+  valor_maximo: string;
+  aceita_propostas: boolean;
+  nome_contratante: string;
+  telefone: string;
+  whatsapp: string;
+  email_contato: string;
+  endereco: string;
+  cidade: string;
+  estado: string;
+  cep: string;
+  referencia_local: string;
+  detalhes: ServiceDetalhes;
 }
 
 const PostService: React.FC = () => {
@@ -27,28 +49,43 @@ const PostService: React.FC = () => {
     titulo: '',
     descricao: '',
     categoria: '',
-    preco: 0,
-    urgente: false,
-    contato: '',
-    localizacao: '',
+    subcategoria: '',
+    objetivo: '',
+    urgencia_nivel: '7dias',
+    data_inicio_desejada: '',
+    data_limite: '',
+    tipo_atendimento: 'presencial',
+    orcamento_definido: false,
+    valor_minimo: '',
+    valor_maximo: '',
+    aceita_propostas: true,
+    nome_contratante: usuario?.nome || '',
+    telefone: usuario?.telefone || '',
+    whatsapp: usuario?.telefone || '',
+    email_contato: usuario?.email || '',
+    endereco: usuario?.endereco || '',
+    cidade: usuario?.cidade || '',
+    estado: usuario?.estado || '',
+    cep: '',
+    referencia_local: '',
+    detalhes: {
+      tamanho_projeto: 'medio',
+      melhor_contato: 'WhatsApp',
+      tipo_profissional: 'indiferente',
+    },
   });
 
   const [fotos, setFotos] = useState<File[]>([]);
-  const [toast, setToast] = useState<ToastState | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [toast, setToast] = useState<{ message: string; isError: boolean } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const categorias: string[] = [
-    'Elétrica',
-    'Hidráulica',
-    'Pintura',
-    'Limpeza',
-    'Construção',
-    'Outros',
-  ];
+  const subcategorias =
+    SUBCATEGORIAS[formData.categoria] || SUBCATEGORIAS.Outros;
 
   const handleChange = (
-    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
   ) => {
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
@@ -58,17 +95,32 @@ const PostService: React.FC = () => {
     }));
   };
 
-  const handleUploadClick = () => {
-    fileInputRef.current?.click();
+  const handleDetalheChange = (
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
+  ) => {
+    const { name, value, type } = e.target;
+    const checked = (e.target as HTMLInputElement).checked;
+    setFormData((prev) => ({
+      ...prev,
+      detalhes: {
+        ...prev.detalhes,
+        [name]: type === 'checkbox' ? checked : value,
+      },
+    }));
   };
 
-  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     setFotos((prev) => [...prev, ...files]);
   };
 
   const removerFoto = (index: number) => {
     setFotos((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const mostrarToast = (msg: string, isError = false) => {
+    setToast({ message: msg, isError });
+    setTimeout(() => setToast(null), 3000);
   };
 
   const validarFormulario = (): boolean => {
@@ -84,27 +136,34 @@ const PostService: React.FC = () => {
       mostrarToast('Selecione uma categoria', true);
       return false;
     }
-    if (!formData.preco || isNaN(Number(formData.preco))) {
-      mostrarToast('Informe um valor válido', true);
+    if (!formData.cidade.trim() && !formData.endereco.trim()) {
+      mostrarToast('Informe cidade ou endereço', true);
       return false;
     }
-    if (!formData.contato.trim()) {
-      mostrarToast('Informe um contato', true);
+    if (!formData.tipo_atendimento) {
+      mostrarToast('Selecione o tipo de atendimento', true);
       return false;
     }
-    if (!formData.localizacao.trim()) {
-      mostrarToast('Informe sua localização', true);
+    if (!formData.nome_contratante.trim()) {
+      mostrarToast('Informe seu nome', true);
+      return false;
+    }
+    if (!formData.telefone.trim() && !formData.whatsapp.trim()) {
+      mostrarToast('Informe telefone ou WhatsApp', true);
+      return false;
+    }
+    if (
+      formData.orcamento_definido &&
+      !formData.valor_minimo &&
+      !formData.valor_maximo
+    ) {
+      mostrarToast('Informe a faixa de orçamento', true);
       return false;
     }
     return true;
   };
 
-  const mostrarToast = (msg: string, isError: boolean = false) => {
-    setToast({ message: msg, isError });
-    setTimeout(() => setToast(null), 3000);
-  };
-
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!validarFormulario() || isSubmitting) return;
 
@@ -116,22 +175,54 @@ const PostService: React.FC = () => {
         fotoUrls = uploadResult.urls;
       }
 
+      const localizacao =
+        formData.cidade && formData.estado
+          ? `${formData.cidade} - ${formData.estado}`
+          : formData.cidade || formData.endereco;
+
       const dadosServico = {
         titulo: formData.titulo,
         descricao: formData.descricao,
         categoria: formData.categoria,
-        preco: formData.preco,
-        urgente: formData.urgente,
-        contato: formData.contato,
-        localizacao: formData.localizacao,
+        subcategoria: formData.subcategoria || null,
+        objetivo: formData.objetivo || null,
+        urgencia_nivel: formData.urgencia_nivel,
+        urgente: formData.urgencia_nivel === '24h',
+        data_inicio_desejada: formData.data_inicio_desejada || null,
+        data_limite: formData.data_limite || null,
+        tipo_atendimento: formData.tipo_atendimento,
+        orcamento_definido: formData.orcamento_definido,
+        valor_minimo: formData.valor_minimo
+          ? Number(formData.valor_minimo)
+          : null,
+        valor_maximo: formData.valor_maximo
+          ? Number(formData.valor_maximo)
+          : null,
+        aceita_propostas: formData.aceita_propostas,
+        nome_contratante: formData.nome_contratante,
+        telefone: formData.telefone,
+        whatsapp: formData.whatsapp,
+        email_contato: formData.email_contato,
+        contato: formData.whatsapp || formData.telefone,
+        localizacao,
+        endereco: formData.endereco,
+        cidade: formData.cidade,
+        estado: formData.estado,
+        cep: formData.cep,
+        referencia_local: formData.referencia_local,
         fotos: fotoUrls,
+        detalhes: formData.detalhes,
       };
+
       await criarServico(dadosServico);
-      mostrarToast('✅ Serviço publicado com sucesso!');
+      mostrarToast('Serviço publicado com sucesso!');
       setTimeout(() => navigate('/client/services'), 1300);
     } catch (error) {
       console.error(error);
-      mostrarToast('Erro ao publicar serviço', true);
+      mostrarToast(
+        error instanceof Error ? error.message : 'Erro ao publicar serviço',
+        true,
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -144,31 +235,34 @@ const PostService: React.FC = () => {
     .form-header { background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; padding: 2rem 2.25rem; display: flex; justify-content: space-between; align-items: center; }
     .header-content h1 { font-size: 1.75rem; font-weight: 800; margin-bottom: 0.3rem; }
     .subhead { opacity: 0.95; font-size: 0.95rem; }
-    .back-btn { background: rgba(255,255,255,0.18); border: none; color: white; padding: 0.65rem 1.2rem; border-radius: 24px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; transition: 0.3s; }
-    .back-btn:hover { background: rgba(255,255,255,0.28); }
+    .back-btn { background: rgba(255,255,255,0.18); border: none; color: white; padding: 0.65rem 1.2rem; border-radius: 24px; font-weight: 600; cursor: pointer; }
     .form-content { padding: 2.25rem; }
-    .field-group { margin-bottom: 1.6rem; }
-    .field-label { font-weight: 700; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.45rem; color: #0f172a; }
+    .section-title { font-size: 1.1rem; font-weight: 800; color: #0f172a; margin: 1.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #e6eef8; display: flex; align-items: center; gap: 8px; }
+    .section-title:first-child { margin-top: 0; }
+    .field-group { margin-bottom: 1.4rem; }
+    .field-label { font-weight: 700; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem; color: #0f172a; font-size: 0.9rem; }
     .required-star { color: #dc2626; }
-    input, textarea { width: 100%; padding: 0.9rem 1rem; border: 1px solid #dbe5f5; border-radius: 16px; font-size: 0.95rem; transition: 0.3s; background: white; font-family: inherit; }
-    input:focus, textarea:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18); }
-    textarea { min-height: 130px; resize: vertical; }
-    .hint-text { margin-top: 0.5rem; font-size: 0.85rem; color: #64748b; }
-    .upload-area { border: 2px dashed #cbd5e1; border-radius: 18px; padding: 2.25rem; text-align: center; cursor: pointer; transition: 0.3s; background: #f8fafc; }
+    input, textarea, select { width: 100%; padding: 0.85rem 1rem; border: 1px solid #dbe5f5; border-radius: 14px; font-size: 0.95rem; background: white; font-family: inherit; }
+    input:focus, textarea:focus, select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+    textarea { min-height: 110px; resize: vertical; }
+    .hint-text { margin-top: 0.4rem; font-size: 0.82rem; color: #64748b; }
+    .upload-area { border: 2px dashed #cbd5e1; border-radius: 16px; padding: 2rem; text-align: center; cursor: pointer; background: #f8fafc; }
     .upload-area:hover { border-color: #3b82f6; background: #eff6ff; }
-    .upload-area i { font-size: 3rem; color: #3b82f6; margin-bottom: 0.8rem; }
-    .file-list { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.75rem; }
-    .file-tag { background: #eff6ff; color: #1d4ed8; padding: 0.6rem 0.85rem; border-radius: 24px; font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem; }
-    .file-tag img { width: 44px; height: 44px; object-fit: cover; border-radius: 10px; }
-    .checkbox-group, .radio-group { display: flex; flex-wrap: wrap; gap: 0.75rem; }
-    .checkbox-item, .radio-item { background: #f8fafc; border: 1px solid #dbe5f5; border-radius: 16px; padding: 0.7rem 1.1rem; cursor: pointer; transition: 0.3s; display: flex; align-items: center; gap: 0.5rem; font-weight: 500; }
-    .checkbox-item:hover, .radio-item:hover { border-color: #93c5fd; }
-    .checkbox-item.selected, .radio-item.selected { border-color: #3b82f6; background: #eff6ff; color: #1d4ed8; }
-    .double-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
-    .publish-btn { width: 100%; border: none; background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; padding: 1rem; border-radius: 20px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
-    .publish-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(59, 130, 246, 0.3); }
+    .file-list { margin-top: 0.8rem; display: flex; flex-wrap: wrap; gap: 0.6rem; }
+    .file-tag { background: #eff6ff; color: #1d4ed8; padding: 0.5rem 0.75rem; border-radius: 20px; font-size: 0.82rem; display: flex; align-items: center; gap: 0.4rem; }
+    .file-tag img { width: 40px; height: 40px; object-fit: cover; border-radius: 8px; }
+    .radio-group { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+    .radio-item { background: #f8fafc; border: 1px solid #dbe5f5; border-radius: 14px; padding: 0.6rem 1rem; cursor: pointer; font-weight: 500; font-size: 0.9rem; }
+    .radio-item.selected { border-color: #3b82f6; background: #eff6ff; color: #1d4ed8; }
+    .double-row, .triple-row { display: grid; gap: 1rem; }
+    .double-row { grid-template-columns: 1fr 1fr; }
+    .triple-row { grid-template-columns: 1fr 1fr 1fr; }
+    .checkbox-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; }
+    .advanced-toggle { width: 100%; background: #f8fafc; border: 1px dashed #cbd5e1; padding: 0.9rem; border-radius: 14px; font-weight: 600; color: #475569; cursor: pointer; margin: 1rem 0; }
+    .advanced-section { padding-top: 0.5rem; }
+    .publish-btn { width: 100%; border: none; background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; padding: 1rem; border-radius: 20px; font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: 1rem; }
     .publish-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-    @media (max-width: 768px) { .double-row { grid-template-columns: 1fr; } .form-header { flex-direction: column; align-items: flex-start; gap: 0.8rem; } .form-content { padding: 1.5rem; } }
+    @media (max-width: 768px) { .double-row, .triple-row { grid-template-columns: 1fr; } .form-header { flex-direction: column; align-items: flex-start; gap: 0.8rem; } }
   `;
 
   return (
@@ -177,28 +271,28 @@ const PostService: React.FC = () => {
       <div className="publish-container">
         <div className="form-header">
           <div className="header-content">
-            <h1>
-              <i className="fas fa-plus-circle"></i> Publicar novo serviço
-            </h1>
+            <h1>Publicar serviço</h1>
             <div className="subhead">
-              Preencha os dados abaixo para encontrar o profissional ideal
+              Descreva sua necessidade e converse com profissionais
             </div>
           </div>
           <button
+            type="button"
             className="back-btn"
             onClick={() => navigate('/client/services')}
           >
-            <i className="fas fa-arrow-left"></i> Voltar
+            Voltar
           </button>
         </div>
+
         <form onSubmit={handleSubmit} className="form-content">
+          <div className="section-title">Dados do serviço</div>
+
           <div className="field-group">
             <div className="field-label">
-              <i className="fas fa-heading"></i> Título do serviço
-              <span className="required-star">*</span>
+              Título <span className="required-star">*</span>
             </div>
             <input
-              type="text"
               name="titulo"
               placeholder="Ex: Instalação elétrica residencial"
               value={formData.titulo}
@@ -208,72 +302,10 @@ const PostService: React.FC = () => {
 
           <div className="field-group">
             <div className="field-label">
-              <i className="fas fa-align-left"></i> Descrição detalhada
-              <span className="required-star">*</span>
-            </div>
-            <textarea
-              name="descricao"
-              placeholder="Descreva o serviço, materiais inclusos, garantia, etc."
-              value={formData.descricao}
-              onChange={handleChange}
-            />
-            <div className="hint-text">
-              Seja o mais claro possível para atrair profissionais qualificados.
-            </div>
-          </div>
-
-          <div className="field-group">
-            <div className="field-label">
-              <i className="fas fa-camera"></i> Fotos do serviço
-            </div>
-            <div className="upload-area" onClick={handleUploadClick}>
-              <i className="fas fa-cloud-upload-alt"></i>
-              <div style={{ fontWeight: 600, marginBottom: '0.3rem' }}>
-                Clique ou arraste imagens aqui
-              </div>
-              <div className="hint-text">JPG, PNG até 5MB cada</div>
-            </div>
-            <input
-              type="file"
-              ref={fileInputRef}
-              style={{ display: 'none' }}
-              multiple
-              accept="image/*"
-              onChange={handleFileChange}
-            />
-            {fotos.length > 0 && (
-              <div className="file-list">
-                {fotos.map((foto, idx) => (
-                  <div key={idx} className="file-tag">
-                    <img src={URL.createObjectURL(foto)} alt={foto.name} />
-                    {foto.name.length > 20
-                      ? foto.name.substring(0, 17) + '...'
-                      : foto.name}
-                    <i
-                      className="fas fa-times-circle"
-                      style={{
-                        cursor: 'pointer',
-                        color: '#dc2626',
-                        fontSize: '1.1rem',
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removerFoto(idx);
-                      }}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="field-group">
-            <div className="field-label">
-              <i className="fas fa-tags"></i> Categoria
-              <span className="required-star">*</span>
+              Categoria <span className="required-star">*</span>
             </div>
             <div className="radio-group">
-              {categorias.map((cat) => (
+              {CATEGORIAS_SERVICO.map((cat) => (
                 <label
                   key={cat}
                   className={`radio-item ${formData.categoria === cat ? 'selected' : ''}`}
@@ -292,73 +324,484 @@ const PostService: React.FC = () => {
             </div>
           </div>
 
+          {subcategorias.length > 0 && (
+            <div className="field-group">
+              <div className="field-label">Subcategoria (opcional)</div>
+              <select
+                name="subcategoria"
+                value={formData.subcategoria}
+                onChange={handleChange}
+              >
+                <option value="">Selecione...</option>
+                {subcategorias.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="field-group">
+            <div className="field-label">
+              Descrição detalhada <span className="required-star">*</span>
+            </div>
+            <textarea
+              name="descricao"
+              placeholder="Descreva o que precisa ser feito..."
+              value={formData.descricao}
+              onChange={handleChange}
+            />
+          </div>
+
+          <div className="section-title">Localização e atendimento</div>
+
+          <div className="field-group">
+            <div className="field-label">
+              Tipo de atendimento <span className="required-star">*</span>
+            </div>
+            <div className="radio-group">
+              {TIPO_ATENDIMENTO.map((t) => (
+                <label
+                  key={t.value}
+                  className={`radio-item ${formData.tipo_atendimento === t.value ? 'selected' : ''}`}
+                >
+                  <input
+                    type="radio"
+                    name="tipo_atendimento"
+                    value={t.value}
+                    checked={formData.tipo_atendimento === t.value}
+                    onChange={handleChange}
+                    style={{ display: 'none' }}
+                  />
+                  {t.label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="triple-row">
+            <div className="field-group">
+              <div className="field-label">
+                Cidade <span className="required-star">*</span>
+              </div>
+              <input
+                name="cidade"
+                value={formData.cidade}
+                onChange={handleChange}
+                placeholder="Sua cidade"
+              />
+            </div>
+            <div className="field-group">
+              <div className="field-label">Estado</div>
+              <select
+                name="estado"
+                value={formData.estado}
+                onChange={handleChange}
+              >
+                <option value="">UF</option>
+                {ESTADOS_BR.map((uf) => (
+                  <option key={uf} value={uf}>
+                    {uf}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field-group">
+              <div className="field-label">CEP</div>
+              <input
+                name="cep"
+                value={formData.cep}
+                onChange={handleChange}
+                placeholder="00000-000"
+              />
+            </div>
+          </div>
+
+          <div className="field-group">
+            <div className="field-label">Endereço do serviço</div>
+            <input
+              name="endereco"
+              value={formData.endereco}
+              onChange={handleChange}
+              placeholder="Rua, número, bairro"
+            />
+          </div>
+
+          <div className="section-title">Prazo e orçamento</div>
+
+          <div className="field-group">
+            <div className="field-label">Nível de urgência</div>
+            <div className="radio-group">
+              {URGENCIA_OPCOES.map((u) => (
+                <label
+                  key={u.value}
+                  className={`radio-item ${formData.urgencia_nivel === u.value ? 'selected' : ''}`}
+                >
+                  <input
+                    type="radio"
+                    name="urgencia_nivel"
+                    value={u.value}
+                    checked={formData.urgencia_nivel === u.value}
+                    onChange={handleChange}
+                    style={{ display: 'none' }}
+                  />
+                  {u.label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="double-row">
+            <div className="field-group">
+              <div className="field-label">Data desejada para início</div>
+              <input
+                type="date"
+                name="data_inicio_desejada"
+                value={formData.data_inicio_desejada}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="field-group">
+              <div className="field-label">Data limite para conclusão</div>
+              <input
+                type="date"
+                name="data_limite"
+                value={formData.data_limite}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+
+          <label className="checkbox-item field-group">
+            <input
+              type="checkbox"
+              name="orcamento_definido"
+              checked={formData.orcamento_definido}
+              onChange={handleChange}
+            />
+            Possuo orçamento definido
+          </label>
+
+          {formData.orcamento_definido && (
+            <div className="double-row">
+              <div className="field-group">
+                <div className="field-label">Valor mínimo (R$)</div>
+                <input
+                  type="number"
+                  name="valor_minimo"
+                  value={formData.valor_minimo}
+                  onChange={handleChange}
+                  step="0.01"
+                  min="0"
+                />
+              </div>
+              <div className="field-group">
+                <div className="field-label">Valor máximo (R$)</div>
+                <input
+                  type="number"
+                  name="valor_maximo"
+                  value={formData.valor_maximo}
+                  onChange={handleChange}
+                  step="0.01"
+                  min="0"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="section-title">Fotos e anexos</div>
+
+          <div className="field-group">
+            <div
+              className="upload-area"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <div style={{ fontWeight: 600 }}>Clique para adicionar fotos</div>
+              <div className="hint-text">JPG, PNG até 5MB cada</div>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              style={{ display: 'none' }}
+              multiple
+              accept="image/*"
+              onChange={handleFileChange}
+            />
+            {fotos.length > 0 && (
+              <div className="file-list">
+                {fotos.map((foto, idx) => (
+                  <div key={idx} className="file-tag">
+                    <img src={URL.createObjectURL(foto)} alt="" />
+                    {foto.name.substring(0, 15)}
+                    <i
+                      className="fas fa-times"
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => removerFoto(idx)}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="section-title">Contato</div>
+
           <div className="double-row">
             <div className="field-group">
               <div className="field-label">
-                <i className="fas fa-dollar-sign"></i> Preço sugerido (R$)
-                <span className="required-star">*</span>
+                Nome <span className="required-star">*</span>
               </div>
               <input
-                type="number"
-                name="preco"
-                placeholder="Ex: 150"
-                value={formData.preco}
+                name="nome_contratante"
+                value={formData.nome_contratante}
                 onChange={handleChange}
-                step="0.01"
               />
             </div>
+            <div className="field-group">
+              <div className="field-label">E-mail</div>
+              <input
+                name="email_contato"
+                type="email"
+                value={formData.email_contato}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
 
+          <div className="double-row">
             <div className="field-group">
               <div className="field-label">
-                <i className="fas fa-bolt"></i> Urgência
+                Telefone <span className="required-star">*</span>
               </div>
-              <label className="checkbox-item" style={{ marginTop: '0.6rem' }}>
+              <input
+                name="telefone"
+                value={formData.telefone}
+                onChange={handleChange}
+                placeholder="(00) 00000-0000"
+              />
+            </div>
+            <div className="field-group">
+              <div className="field-label">WhatsApp</div>
+              <input
+                name="whatsapp"
+                value={formData.whatsapp}
+                onChange={handleChange}
+                placeholder="(00) 00000-0000"
+              />
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="advanced-toggle"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+          >
+            {showAdvanced ? '▼ Ocultar detalhes avançados' : '▶ Mostrar detalhes avançados (opcional)'}
+          </button>
+
+          {showAdvanced && (
+            <div className="advanced-section">
+              <div className="field-group">
+                <div className="field-label">Objetivo do serviço</div>
+                <input
+                  name="objetivo"
+                  value={formData.objetivo}
+                  onChange={handleChange}
+                  placeholder="O que você espera alcançar?"
+                />
+              </div>
+
+              <div className="field-group">
+                <div className="field-label">Referência do local</div>
+                <input
+                  name="referencia_local"
+                  value={formData.referencia_local}
+                  onChange={handleChange}
+                />
+              </div>
+
+              <div className="field-group">
+                <div className="field-label">Tamanho do projeto</div>
+                <div className="radio-group">
+                  {TAMANHO_PROJETO.map((t) => (
+                    <label
+                      key={t.value}
+                      className={`radio-item ${formData.detalhes.tamanho_projeto === t.value ? 'selected' : ''}`}
+                    >
+                      <input
+                        type="radio"
+                        name="tamanho_projeto"
+                        value={t.value}
+                        checked={formData.detalhes.tamanho_projeto === t.value}
+                        onChange={handleDetalheChange}
+                        style={{ display: 'none' }}
+                      />
+                      {t.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="field-group">
+                <div className="field-label">Quantidade estimada do trabalho</div>
+                <input
+                  name="quantidade_estimada"
+                  value={formData.detalhes.quantidade_estimada || ''}
+                  onChange={handleDetalheChange}
+                  placeholder="Ex: 3 cômodos, 50m²"
+                />
+              </div>
+
+              <label className="checkbox-item field-group">
                 <input
                   type="checkbox"
-                  name="urgente"
-                  checked={formData.urgente}
-                  onChange={handleChange}
-                />{' '}
-                Este serviço é urgente (precisa de atendimento rápido)
+                  name="materiais_disponiveis"
+                  checked={!!formData.detalhes.materiais_disponiveis}
+                  onChange={handleDetalheChange}
+                />
+                Materiais já disponíveis
               </label>
-            </div>
-          </div>
 
-          <div className="double-row">
-            <div className="field-group">
-              <div className="field-label">
-                <i className="fas fa-phone-alt"></i> Contato
-                <span className="required-star">*</span>
+              <div className="field-group">
+                <div className="field-label">Equipamentos necessários</div>
+                <input
+                  name="equipamentos_necessarios"
+                  value={formData.detalhes.equipamentos_necessarios || ''}
+                  onChange={handleDetalheChange}
+                />
               </div>
-              <input
-                type="text"
-                name="contato"
-                placeholder="Telefone ou e-mail"
-                value={formData.contato}
-                onChange={handleChange}
-              />
-            </div>
 
-            <div className="field-group">
-              <div className="field-label">
-                <i className="fas fa-map-marker-alt"></i> Localização
-                <span className="required-star">*</span>
+              <label className="checkbox-item field-group">
+                <input
+                  type="checkbox"
+                  name="nota_fiscal"
+                  checked={!!formData.detalhes.nota_fiscal}
+                  onChange={handleDetalheChange}
+                />
+                Necessita emissão de nota fiscal
+              </label>
+
+              <div className="field-group">
+                <div className="field-label">Certificação exigida</div>
+                <input
+                  name="certificacao"
+                  value={formData.detalhes.certificacao || ''}
+                  onChange={handleDetalheChange}
+                />
               </div>
-              <input
-                type="text"
-                name="localizacao"
-                placeholder="Cidade, bairro ou região"
-                value={formData.localizacao}
-                onChange={handleChange}
-              />
-              <div className="hint-text">
-                O profissional verá essa informação
+
+              <div className="field-group">
+                <div className="field-label">Tipo de profissional</div>
+                <div className="radio-group">
+                  {TIPO_PROFISSIONAL.map((t) => (
+                    <label
+                      key={t.value}
+                      className={`radio-item ${formData.detalhes.tipo_profissional === t.value ? 'selected' : ''}`}
+                    >
+                      <input
+                        type="radio"
+                        name="tipo_profissional"
+                        value={t.value}
+                        checked={formData.detalhes.tipo_profissional === t.value}
+                        onChange={handleDetalheChange}
+                        style={{ display: 'none' }}
+                      />
+                      {t.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="double-row">
+                <div className="field-group">
+                  <div className="field-label">Experiência mínima</div>
+                  <input
+                    name="experiencia_minima"
+                    value={formData.detalhes.experiencia_minima || ''}
+                    onChange={handleDetalheChange}
+                    placeholder="Ex: 2 anos"
+                  />
+                </div>
+                <div className="field-group">
+                  <div className="field-label">Avaliação mínima (estrelas)</div>
+                  <input
+                    type="number"
+                    name="avaliacao_minima"
+                    min="1"
+                    max="5"
+                    value={formData.detalhes.avaliacao_minima || ''}
+                    onChange={handleDetalheChange}
+                  />
+                </div>
+              </div>
+
+              <div className="double-row">
+                <div className="field-group">
+                  <div className="field-label">Dias disponíveis</div>
+                  <input
+                    name="dias_disponiveis"
+                    value={formData.detalhes.dias_disponiveis || ''}
+                    onChange={handleDetalheChange}
+                    placeholder="Seg a Sex"
+                  />
+                </div>
+                <div className="field-group">
+                  <div className="field-label">Horários disponíveis</div>
+                  <input
+                    name="horarios_disponiveis"
+                    value={formData.detalhes.horarios_disponiveis || ''}
+                    onChange={handleDetalheChange}
+                    placeholder="Manhã / Tarde"
+                  />
+                </div>
+              </div>
+
+              <div className="field-group">
+                <div className="field-label">Melhor forma de contato</div>
+                <select
+                  name="melhor_contato"
+                  value={formData.detalhes.melhor_contato || ''}
+                  onChange={handleDetalheChange}
+                >
+                  {MELHOR_CONTATO.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="field-group">
+                <div className="field-label">Observações adicionais</div>
+                <textarea
+                  name="observacoes"
+                  value={formData.detalhes.observacoes || ''}
+                  onChange={handleDetalheChange}
+                />
+              </div>
+
+              <div className="field-group">
+                <div className="field-label">Restrição de acesso ao local</div>
+                <input
+                  name="restricao_acesso"
+                  value={formData.detalhes.restricao_acesso || ''}
+                  onChange={handleDetalheChange}
+                />
+              </div>
+
+              <div className="field-group">
+                <div className="field-label">Riscos ou requisitos de segurança</div>
+                <input
+                  name="risco_seguranca"
+                  value={formData.detalhes.risco_seguranca || ''}
+                  onChange={handleDetalheChange}
+                />
               </div>
             </div>
-          </div>
+          )}
 
           <button type="submit" className="publish-btn" disabled={isSubmitting}>
-            <i className="fas fa-paper-plane"></i>{' '}
             {isSubmitting ? 'Publicando...' : 'Publicar serviço'}
           </button>
         </form>
@@ -374,10 +817,10 @@ const PostService: React.FC = () => {
 
       <link
         rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
       />
       <link
-        href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@300;400;500;600;700;800&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap"
         rel="stylesheet"
       />
     </>

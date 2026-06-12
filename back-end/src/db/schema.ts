@@ -65,11 +65,33 @@ export const professionalServices = sqliteTable("professional_services", {
   titulo: text("titulo").notNull(),
   descricao: text("descricao"),
   categoria: text("categoria"),
+  subcategoria: text("subcategoria"),
+  objetivo: text("objetivo"),
   preco: real("preco"),
+  valor_minimo: real("valor_minimo"),
+  valor_maximo: real("valor_maximo"),
+  orcamento_definido: int("orcamento_definido").default(0),
+  aceita_propostas: int("aceita_propostas").default(1),
   urgente: int("urgente").default(0),
+  urgencia_nivel: text("urgencia_nivel"),
+  data_inicio_desejada: text("data_inicio_desejada"),
+  data_limite: text("data_limite"),
+  tipo_atendimento: text("tipo_atendimento"),
   contato: text("contato"),
+  nome_contratante: text("nome_contratante"),
+  telefone: text("telefone"),
+  whatsapp: text("whatsapp"),
+  email_contato: text("email_contato"),
   localizacao: text("localizacao"),
-  fotos: text("fotos"), // array de URLs em JSON
+  endereco: text("endereco"),
+  cidade: text("cidade"),
+  estado: text("estado"),
+  cep: text("cep"),
+  referencia_local: text("referencia_local"),
+  fotos: text("fotos"),
+  anexos: text("anexos"),
+  detalhes: text("detalhes"),
+  status_solicitacao: text("status_solicitacao").default("AGUARDANDO_PROPOSTAS"),
   status: text("status")
     .notNull()
     .$type<
@@ -82,6 +104,56 @@ export const professionalServices = sqliteTable("professional_services", {
       | "AVALIADA"
     >()
     .default("PENDENTE"),
+  created_at: int("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export const conversations = sqliteTable("conversations", {
+  id: int("id").primaryKey({ autoIncrement: true }),
+  service_id: int("service_id")
+    .notNull()
+    .references(() => professionalServices.id, { onDelete: "cascade" }),
+  client_id: int("client_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  professional_id: int("professional_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  status: text("status")
+    .notNull()
+    .$type<
+      | "ABERTA"
+      | "EM_NEGOCIACAO"
+      | "CONTRATADA"
+      | "EM_ANDAMENTO"
+      | "CONCLUIDA"
+      | "CANCELADA"
+    >()
+    .default("ABERTA"),
+  created_at: int("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updated_at: int("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export const messages = sqliteTable("messages", {
+  id: int("id").primaryKey({ autoIncrement: true }),
+  conversation_id: int("conversation_id")
+    .notNull()
+    .references(() => conversations.id, { onDelete: "cascade" }),
+  sender_id: int("sender_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  tipo: text("tipo")
+    .notNull()
+    .$type<"texto" | "oferta" | "imagem" | "sistema">()
+    .default("texto"),
+  conteudo: text("conteudo").notNull(),
+  metadata: text("metadata"),
+  lida: int("lida").default(0),
   created_at: int("created_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -210,8 +282,41 @@ export const professionalServicesRelations = relations(
       references: [users.id],
     }),
     proposalProfessionals: many(proposalProfessionals),
+    conversations: many(conversations),
   }),
 );
+
+export const conversationsRelations = relations(
+  conversations,
+  ({ one, many }) => ({
+    service: one(professionalServices, {
+      fields: [conversations.service_id],
+      references: [professionalServices.id],
+    }),
+    client: one(users, {
+      fields: [conversations.client_id],
+      references: [users.id],
+      relationName: "client_conversations",
+    }),
+    professional: one(users, {
+      fields: [conversations.professional_id],
+      references: [users.id],
+      relationName: "professional_conversations",
+    }),
+    messages: many(messages),
+  }),
+);
+
+export const messagesRelations = relations(messages, ({ one }) => ({
+  conversation: one(conversations, {
+    fields: [messages.conversation_id],
+    references: [conversations.id],
+  }),
+  sender: one(users, {
+    fields: [messages.sender_id],
+    references: [users.id],
+  }),
+}));
 
 export const proposalProfessionalsRelations = relations(
   proposalProfessionals,

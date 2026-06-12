@@ -146,7 +146,7 @@ const Home = () => {
 
   const styles = `
     * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
-    body { background: #fff7ed; color: #1f2937; padding: 0 0 32px 0; }
+    .home-container { width: 100%; min-height: 100vh; background: #fff7ed; color: #1f2937; }
     .user-header { width: 100%; background: white; padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.08); position: sticky; top: 0; z-index: 100; flex-wrap: wrap; gap: 16px; border-bottom: 1px solid #fed7aa; }
     .user-info h2 { font-size: 24px; margin-bottom: 5px; color: #111827; }
     .user-location { color: #6b7280; font-size: 14px; display: flex; align-items: center; gap: 6px; }
@@ -159,7 +159,7 @@ const Home = () => {
     .location { display: flex; align-items: center; gap: 6px; color: #6b7280; font-size: 0.9rem; margin-top: 4px; }
     .edit-icon { background: #fff7ed; padding: 10px 18px; border-radius: 40px; font-size: 0.85rem; font-weight: 600; color: #c2410c; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 6px; }
     .edit-icon:hover { background: #fed7aa; }
-    .container { max-width: 1400px; align-content: start; margin: 0 auto; padding: 0 40px; display: grid; grid-template-columns: 2fr 1fr; gap: 28px; }
+    .main-grid { max-width: 1400px; margin: 0 auto; padding: 30px 40px 48px; display: grid; grid-template-columns: 2fr 1fr; gap: 28px; align-content: start; }
     .section-title { font-size: 1.6rem; font-weight: 700; color: #1f2937; margin: 16px 0 20px 0; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; justify-content: space-between; }
     .services-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-bottom: 32px; }
     .service-card { background: white; border-radius: 24px; padding: 24px; box-shadow: 0 5px 15px rgba(0,0,0,0.06); transition: all 0.3s; border: 1px solid #fed7aa; cursor: pointer; }
@@ -183,7 +183,7 @@ const Home = () => {
     .success-toast { position: fixed; top: 80px; right: 20px; padding: 14px 24px; border-radius: 40px; color: white; font-weight: 600; z-index: 9999; background: #f97316; box-shadow: 0 4px 15px rgba(249, 115, 22, 0.35); animation: fadeInOut 3s ease forwards; }
     @keyframes fadeInOut { 0% { opacity: 0; transform: translateX(20px); } 15% { opacity: 1; transform: translateX(0); } 85% { opacity: 1; transform: translateX(0); } 100% { opacity: 0; transform: translateX(20px); visibility: hidden; } }
     @media (max-width: 1024px) { 
-      .container { grid-template-columns: 1fr;  padding: 0 20px; } 
+      .main-grid { grid-template-columns: 1fr; padding: 24px 20px 40px; } 
     }
     @media (max-width: 680px) { 
       .user-header { padding: 16px 20px; flex-direction: column; align-items: flex-start; } 
@@ -193,6 +193,7 @@ const Home = () => {
   return (
     <>
       <style>{styles}</style>
+      <div className="home-container">
       <div className="user-header">
         <div className="user-info">
           <h2>Olá, {userName.split(' ')[0]}!👋</h2>
@@ -217,10 +218,10 @@ const Home = () => {
           </button>
           <button
             className="icon-btn"
-            onClick={() => navigate('/professional/proposals')}
-            title="Minhas Propostas"
+            onClick={() => navigate('/professional/messages')}
+            title="Mensagens"
           >
-            <i className="fas fa-briefcase"></i>
+            <i className="fas fa-comments"></i>
           </button>
           <button
             className="icon-btn"
@@ -237,7 +238,7 @@ const Home = () => {
 
    
 
-      <div className="container">
+      <div className="main-grid">
         <div className="services-section">
           <div className="section-title">
             <span>
@@ -435,6 +436,7 @@ const Home = () => {
         userType="PROFISSIONAL"
         onFavoritesUpdated={carregarFavoritosIds}
       />
+      </div>
 
       <link
         rel="stylesheet"

@@ -32,6 +32,16 @@ export type PropostaServicoStatus =
 
 export type FiltroProposta = 'all' | 'aguardando' | 'aceita' | 'recusada';
 
+export type ConversationStatus =
+  | 'ABERTA'
+  | 'EM_NEGOCIACAO'
+  | 'CONTRATADA'
+  | 'EM_ANDAMENTO'
+  | 'CONCLUIDA'
+  | 'CANCELADA';
+
+export type MessageTipo = 'texto' | 'oferta' | 'imagem' | 'sistema';
+
 // ==========================================
 // USER
 // ==========================================
@@ -203,6 +213,72 @@ export interface ServicoPublicado {
   clienteNome: string;
 
   status: ServicoStatus;
+}
+
+export interface ServicoAnuncio {
+  id: number;
+  client_id: number;
+  titulo: string;
+  descricao: string;
+  categoria: string;
+  subcategoria?: string | null;
+  objetivo?: string | null;
+  preco?: number | null;
+  valor_minimo?: number | null;
+  valor_maximo?: number | null;
+  orcamento_definido?: number;
+  aceita_propostas?: number;
+  urgente?: number;
+  urgencia_nivel?: string | null;
+  data_inicio_desejada?: string | null;
+  data_limite?: string | null;
+  tipo_atendimento?: string | null;
+  contato?: string | null;
+  nome_contratante?: string | null;
+  telefone?: string | null;
+  whatsapp?: string | null;
+  email_contato?: string | null;
+  localizacao?: string | null;
+  endereco?: string | null;
+  cidade?: string | null;
+  estado?: string | null;
+  cep?: string | null;
+  referencia_local?: string | null;
+  fotos?: string | string[] | null;
+  anexos?: string | string[] | null;
+  detalhes?: string | Record<string, unknown> | null;
+  status: string;
+  status_solicitacao?: string | null;
+  created_at?: number;
+  cliente_nome?: string;
+}
+
+export interface Conversation {
+  id: number;
+  service_id: number;
+  client_id: number;
+  professional_id: number;
+  status: ConversationStatus;
+  created_at: number;
+  updated_at: number;
+  servico_titulo?: string;
+  servico_categoria?: string;
+  servico_status?: string;
+  outro_nome?: string;
+  outro_foto?: string | null;
+  servico?: ServicoAnuncio;
+}
+
+export interface ChatMessage {
+  id: number;
+  conversation_id: number;
+  sender_id: number;
+  tipo: MessageTipo;
+  conteudo: string;
+  metadata?: { valor?: number; negociavel?: boolean } | null;
+  lida?: number;
+  created_at: number;
+  sender_nome?: string;
 }
 
 // ==========================================

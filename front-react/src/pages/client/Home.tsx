@@ -252,10 +252,10 @@ const Home = () => {
             </button>
             <button
               className="icon-btn"
-              onClick={() => navigate('/client/proposals')}
-              title="Propostas"
+              onClick={() => navigate('/client/messages')}
+              title="Mensagens"
             >
-              <i className="fas fa-file-contract"></i>
+              <i className="fas fa-comments"></i>
             </button>
             <button
               className="icon-btn"

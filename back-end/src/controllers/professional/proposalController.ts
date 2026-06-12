@@ -134,8 +134,6 @@ export class ProposalController {
         "propostas encontradas",
       );
       res.json({ propostas });
-
-      res.json({ propostas: propostasComAvaliacao });
     } catch (error) {
       console.error("❌ [listarMinhas] Erro completo ao listar propostas:", {
         message: error instanceof Error ? error.message : "Erro desconhecido",

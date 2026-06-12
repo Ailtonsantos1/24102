@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { checkFavoriteUser, toggleFavoriteUser } from '../../services/api';
+import {
+  checkFavoriteUser,
+  toggleFavoriteUser,
+  iniciarConversa,
+  obterServicoPorId,
+} from '../../services/api';
+import { URGENCIA_OPCOES, TIPO_ATENDIMENTO } from '../../lib/serviceOptions';
 
 const ServiceDetails = () => {
   // Hooks
@@ -17,27 +23,43 @@ const ServiceDetails = () => {
   const [modalTitle, setModalTitle] = useState('');
   const [modalMessage, setModalMessage] = useState('');
   const [isClientFavorite, setIsClientFavorite] = useState(false);
+  const [iniciandoChat, setIniciandoChat] = useState(false);
+
+  const parseServico = (servicoData: Record<string, unknown>) => {
+    if (servicoData.fotos && typeof servicoData.fotos === 'string') {
+      try {
+        servicoData.fotos = JSON.parse(servicoData.fotos);
+      } catch {
+        servicoData.fotos = [];
+      }
+    }
+    return servicoData;
+  };
 
   // Effects
   useEffect(() => {
-    if (location.state?.servico) {
-      const servicoData = location.state.servico;
-      if (servicoData.fotos && typeof servicoData.fotos === 'string') {
+    const carregar = async () => {
+      let servicoData = location.state?.servico;
+      if (!servicoData && id) {
         try {
-          servicoData.fotos = JSON.parse(servicoData.fotos);
+          const data = await obterServicoPorId(id);
+          servicoData = data.servico;
         } catch (e) {
-          servicoData.fotos = [];
+          console.error(e);
         }
       }
-      setServico(servicoData);
-      
-      // Checar favorito se tiver cliente_id
-      if (servicoData.cliente_id) {
-        checkFavoriteUser(servicoData.cliente_id, true)
-          .then(res => setIsClientFavorite(res.isFavorite))
-          .catch(console.error);
+      if (servicoData) {
+        const parsed = parseServico(servicoData);
+        setServico(parsed);
+        const clienteId = (parsed.cliente_id || parsed.client_id) as number | undefined;
+        if (clienteId) {
+          checkFavoriteUser(clienteId, true)
+            .then((res) => setIsClientFavorite(res.isFavorite))
+            .catch(console.error);
+        }
       }
-    }
+    };
+    carregar();
   }, [id, location]);
 
   // Functions
@@ -60,10 +82,12 @@ const ServiceDetails = () => {
       `Você manifestou interesse no serviço "${servico?.titulo}". O cliente será notificado.`
     );
 
+  const clienteId = servico?.cliente_id ?? servico?.client_id;
+
   const handleToggleFavoriteClient = async () => {
-    if (!servico?.cliente_id) return;
+    if (!clienteId) return;
     try {
-      const res = await toggleFavoriteUser(servico.cliente_id, true);
+      const res = await toggleFavoriteUser(clienteId, true);
       setIsClientFavorite(res.isFavorite);
       showToast(res.isFavorite ? 'Cliente favoritado! ❤️' : 'Cliente removido dos favoritos.');
     } catch (error) {
@@ -72,74 +96,91 @@ const ServiceDetails = () => {
     }
   };
 
-  const handleProposal = () =>
-    navigate('/professional/send-proposal', { state: { servico } });
+  const handleConversar = async () => {
+    if (!servico?.id || iniciandoChat) return;
+    setIniciandoChat(true);
+    try {
+      const result = await iniciarConversa(servico.id);
+      const conversaId = result.conversa?.id;
+      if (conversaId) {
+        navigate(`/professional/messages?id=${conversaId}`);
+      } else {
+        showToast('Erro ao iniciar conversa');
+      }
+    } catch (error) {
+      console.error(error);
+      showToast(
+        error instanceof Error ? error.message : 'Erro ao iniciar conversa',
+      );
+    } finally {
+      setIniciandoChat(false);
+    }
+  };
+
+  const urgenciaLabel =
+    URGENCIA_OPCOES.find((u) => u.value === servico?.urgencia_nivel)?.label ||
+    (servico?.urgente === 1 ? 'Urgente' : 'Normal');
+
+  const atendimentoLabel =
+    TIPO_ATENDIMENTO.find((t) => t.value === servico?.tipo_atendimento)
+      ?.label || servico?.tipo_atendimento;
+
+  const formatOrcamento = () => {
+    if (servico?.valor_minimo || servico?.valor_maximo) {
+      const min = servico.valor_minimo
+        ? `R$ ${Number(servico.valor_minimo).toFixed(2)}`
+        : '';
+      const max = servico.valor_maximo
+        ? `R$ ${Number(servico.valor_maximo).toFixed(2)}`
+        : '';
+      if (min && max) return `${min} – ${max}`;
+      return min || max;
+    }
+    if (servico?.preco) return `R$ ${Number(servico.preco).toFixed(2)}`;
+    return 'A negociar';
+  };
 
   // Loading state
-  if (!servico) return <div className="container">Carregando...</div>;
+  if (!servico) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px', color: '#c2410c' }}>
+        <i className="fas fa-spinner fa-spin" style={{ fontSize: '2rem' }}></i>
+        <p>Carregando serviço...</p>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+      </div>
+    );
+  }
 
   // Styles
   const styles = `
-    * { 
-      margin: 0; 
-      padding: 0; 
-      box-sizing: border-box; 
-      font-family: 'Inter', sans-serif; 
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+    .prof-detail-page { min-height: 100vh; background: #fff7ed; color: #1f2937; }
+    .prof-detail-loading {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 60vh; gap: 16px; color: #c2410c; font-size: 1.1rem;
     }
-    
-    body { 
-      background: #fff7ed; 
-      min-height: 100vh;
+    .user-header {
+      width: 100%; background: white; padding: 20px 40px;
+      display: flex; justify-content: space-between; align-items: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08); position: sticky; top: 0; z-index: 100;
+      flex-wrap: wrap; gap: 16px; border-bottom: 1px solid #fed7aa;
     }
-    
-    .container { 
-      max-width: 1100px; 
-      margin: 0 auto; 
-      padding: 32px 20px 48px; 
+    .user-info { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .user-info h2 { font-size: 1.25rem; color: #7c2d12; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .user-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+    .icon-btn {
+      width: 45px; height: 45px; border: none; border-radius: 12px;
+      background: #fff7ed; color: #f97316; display: inline-flex; align-items: center;
+      justify-content: center; font-size: 18px; transition: 0.2s; cursor: pointer;
     }
-    
-    .top-bar { 
-      display: flex; 
-      justify-content: space-between; 
-      align-items: center; 
-      flex-wrap: wrap; 
-      gap: 16px;
-      margin-bottom: 32px; 
-      background: white; 
-      padding: 16px 32px; 
-      border-radius: 80px; 
-      box-shadow: 0 2px 12px rgba(0,0,0,0.05); 
-      border: 1px solid #fed7aa; 
+    .icon-btn:hover { background: #f97316; color: white; transform: translateY(-2px); }
+    .back-btn {
+      background: #fff7ed; padding: 10px 20px; border-radius: 40px; border: none;
+      color: #c2410c; font-weight: 600; font-size: 0.9rem; cursor: pointer;
+      display: flex; align-items: center; gap: 8px; transition: 0.2s;
     }
-    
-    .page-title { 
-      font-weight: 800; 
-      font-size: 1.6rem; 
-      color: #7c2d12; 
-      display: flex; 
-      align-items: center; 
-      gap: 10px; 
-    }
-    
-    .back-home { 
-      background: #fff7ed; 
-      padding: 10px 22px; 
-      border-radius: 60px; 
-      text-decoration: none; 
-      color: #c2410c; 
-      font-weight: 600; 
-      font-size: 0.9rem; 
-      transition: all 0.2s; 
-      cursor: pointer; 
-      display: flex; 
-      align-items: center; 
-      gap: 6px; 
-    }
-    
-    .back-home:hover { 
-      background: #fed7aa; 
-      transform: translateY(-1px); 
-    }
+    .back-btn:hover { background: #fed7aa; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 32px 40px 48px; }
     
     .service-detail-grid { 
       display: flex; 
@@ -376,76 +417,40 @@ const ServiceDetails = () => {
       }
     }
     
-    @media (max-width: 700px) {
-      .top-bar { 
-        padding: 16px 20px; 
-        justify-content: center;
-        text-align: center;
-      }
-      
-      .page-title {
-        width: 100%;
-        justify-content: center;
-      }
-      
-      .service-detail-grid {
-        gap: 24px;
-      }
-      
-      .action-buttons {
-        flex-direction: column;
-      }
-      
-      .btn-interest, .btn-proposal {
-        width: 100%;
-        justify-content: center;
-      }
-      
-      .info-row span:first-child {
-        min-width: auto;
-      }
+    @media (max-width: 900px) {
+      .container { padding: 24px 20px 40px; }
+      .user-header { padding: 16px 20px; }
     }
-    
-    @media (max-width: 400px) {
-      .top-bar {
-        border-radius: 30px;
-        padding: 14px 16px;
-      }
-      
-      .page-title {
-        font-size: 1.25rem;
-      }
-      
-      .service-title {
-        font-size: 1.5rem;
-      }
-      
-      .quick-info h3 {
-        font-size: 1.2rem;
-      }
-      
-      .modal-card {
-        padding: 28px 20px;
-      }
+    @media (max-width: 700px) {
+      .service-detail-grid { gap: 24px; }
+      .action-buttons { flex-direction: column; }
+      .btn-interest, .btn-proposal { width: 100%; justify-content: center; }
+      .info-row span:first-child { min-width: auto; }
     }
   `;
 
   return (
     <>
       <style>{styles}</style>
-      <div className="container">
-        <div className="top-bar">
-          <div className="page-title">
-            <i className="fas fa-tools"></i> Detalhes do Serviço
+      <div className="prof-detail-page">
+        <div className="user-header">
+          <div className="user-info">
+            <button className="back-btn" onClick={() => navigate('/professional/home')}>
+              <i className="fas fa-arrow-left"></i> Voltar
+            </button>
+            <h2><i className="fas fa-tools"></i> Detalhes do Serviço</h2>
           </div>
-          <button
-            className="back-home"
-            onClick={() => navigate('/professional/home')}
-          >
-            <i className="fas fa-arrow-left"></i> Voltar para Home
-          </button>
+          <div className="user-actions">
+            <button className="icon-btn" onClick={() => navigate('/professional/messages')} title="Mensagens">
+              <i className="fas fa-comments"></i>
+            </button>
+            <button className="icon-btn" onClick={() => navigate('/professional/profile')} title="Perfil">
+              <i className="fas fa-user"></i>
+            </button>
+          </div>
         </div>
 
+        <div className="container">
         <div className="service-detail-grid">
           <div className="image-column">
             {servico.fotos && servico.fotos.length > 0 ? (
@@ -479,7 +484,7 @@ const ServiceDetails = () => {
                 <span>👤 Cliente</span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {servico.cliente_nome}
-                  {servico.cliente_id && (
+                  {clienteId && (
                     <button 
                       onClick={handleToggleFavoriteClient}
                       style={{
@@ -498,33 +503,46 @@ const ServiceDetails = () => {
                 <span>{servico.localizacao}</span>
               </div>
               <div className="info-row">
-                <span>💰 Valor</span>
+                <span>🏷️ Categoria</span>
                 <span>
-                  {servico.preco
-                    ? `R$ ${Number(servico.preco).toFixed(2)}`
-                    : 'A negociar'}
+                  {servico.categoria}
+                  {servico.subcategoria ? ` / ${servico.subcategoria}` : ''}
                 </span>
               </div>
               <div className="info-row">
-                <span>⏰ Urgência</span>
-                <span>
-                  {servico.urgente === 1 ? '🔴 Sim, urgente!' : 'Não'}
-                </span>
+                <span>💰 Orçamento</span>
+                <span>{formatOrcamento()}</span>
               </div>
+              <div className="info-row">
+                <span>⏰ Prazo</span>
+                <span>{urgenciaLabel}</span>
+              </div>
+              {atendimentoLabel && (
+                <div className="info-row">
+                  <span>🖥️ Atendimento</span>
+                  <span>{atendimentoLabel}</span>
+                </div>
+              )}
               <div className="info-row">
                 <span>📞 Contato</span>
-                <span>{servico.contato}</span>
+                <span>{servico.contato || servico.whatsapp || servico.telefone}</span>
               </div>
             </div>
             <div className="action-buttons">
               <button className="btn-interest" onClick={handleInterest}>
                 <i className="fas fa-hand-paper"></i> Tenho Interesse
               </button>
-              <button className="btn-proposal" onClick={handleProposal}>
-                <i className="fas fa-paper-plane"></i> Enviar Proposta
+              <button
+                className="btn-proposal"
+                onClick={handleConversar}
+                disabled={iniciandoChat}
+              >
+                <i className="fas fa-comments"></i>{' '}
+                {iniciandoChat ? 'Abrindo chat...' : 'Iniciar conversa'}
               </button>
             </div>
           </div>
+        </div>
         </div>
       </div>
 

@@ -4,6 +4,7 @@ import { ProposalController } from "../../controllers/professional/proposalContr
 import { ServiceController } from "../../controllers/professional/ServiceController.js";
 import { FavoritesController } from "../../controllers/FavoritesController.js";
 import { ProfessionalRatingController } from "../../controllers/professional/ratingController.js";
+import { ConversationController } from "../../controllers/ConversationController.js";
 import { authenticateToken } from "../../middleware/authMiddleware.js";
 
 const router = Router();
@@ -46,6 +47,24 @@ router.post(
 );
 router.get("/proposals", authenticateToken, ProposalController.listarMinhas);
 
+router.post("/conversations", authenticateToken, ConversationController.iniciar);
+router.get("/conversations", authenticateToken, ConversationController.listar);
+router.get(
+  "/conversations/service/:serviceId",
+  authenticateToken,
+  ConversationController.porServico,
+);
+router.get("/conversations/:id", authenticateToken, ConversationController.obter);
+router.post(
+  "/conversations/:id/messages",
+  authenticateToken,
+  ConversationController.enviarMensagem,
+);
+router.patch(
+  "/conversations/:id/concluir",
+  authenticateToken,
+  ConversationController.concluir,
+);
 // Rotas de favoritos (Usuários) para profissionais
 router.post(
   "/favorites/users",
