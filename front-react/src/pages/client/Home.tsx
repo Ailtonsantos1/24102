@@ -1,10 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { listarProfissionais, listFavoriteUsers, toggleFavoriteUser } from '../../services/api';
+import {
+  listarProfissionais,
+  listFavoriteUsers,
+  toggleFavoriteUser,
+  obterStatusAssinatura,
+  criarCheckoutAssinatura,
+  type PlanId,
+} from '../../services/api';
 import { getUserLocation, getUserCity } from '../../lib/userLocation';
 import CitySearchBar from '../../components/CitySearchBar';
 import FavoritesModal from '../../components/FavoritesModal';
+import ClientPremiumPlansCard from '../../components/client/ClientPremiumPlansCard';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -22,6 +30,7 @@ const Home = () => {
   const [cidadeFiltro, setCidadeFiltro] = useState('');
   const [carregando, setCarregando] = useState(false);
   const [favoritesModalOpen, setFavoritesModalOpen] = useState(false);
+  const [currentPlan, setCurrentPlan] = useState<PlanId>('FREE');
   const toastTimeoutRef = useRef(null);
 
   const showToast = (message, isError = false) => {
@@ -65,6 +74,12 @@ const Home = () => {
     const carregarDados = async () => {
       await carregarProfissionais();
       await carregarFavoritosIds();
+      try {
+        const status = await obterStatusAssinatura(false);
+        if (status.plan) setCurrentPlan(status.plan);
+      } catch (error) {
+        console.error(error);
+      }
     };
     carregarDados();
   }, []);

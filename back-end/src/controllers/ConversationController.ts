@@ -8,6 +8,7 @@ import {
   users,
 } from "../db/schema.js";
 import { eq, and, desc, or } from "drizzle-orm";
+import { getProfessionalLimits } from "../services/subscriptionService.js";
 
 export class ConversationController {
   static async iniciar(req: Request, res: Response) {
@@ -38,6 +39,8 @@ export class ConversationController {
         return res.status(400).json({ erro: "Este serviço não está aberto" });
       }
 
+      const profLimits = await getProfessionalLimits(user.userId);
+
       const [existing] = await db
         .select()
         .from(conversations)
@@ -50,6 +53,15 @@ export class ConversationController {
 
       if (existing) {
         return res.json({ conversa: existing, criada: false });
+      }
+
+      if (!profLimits.canContactMore) {
+        return res.status(400).json({
+          erro: `Limite diário de ${profLimits.maxDailyContacts} contatos atingido (plano ${profLimits.plan}). Faça upgrade para continuar.`,
+          plan: profLimits.plan,
+          maxDailyContacts: profLimits.maxDailyContacts,
+          currentDailyContacts: profLimits.currentDailyContacts,
+        });
       }
 
       const [conversa] = await db

@@ -1,10 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { listarTodosServicos, listFavoriteServices, toggleFavoriteService } from '../../services/api';
+import {
+  listarTodosServicos,
+  listFavoriteServices,
+  toggleFavoriteService,
+  obterStatusAssinatura,
+  criarCheckoutAssinatura,
+  type PlanId,
+} from '../../services/api';
 import { getUserLocation, getUserCity } from '../../lib/userLocation';
 import CitySearchBar from '../../components/CitySearchBar';
 import FavoritesModal from '../../components/FavoritesModal';
+import PremiumPlansCard from '../../components/professional/PremiumPlansCard';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -17,6 +25,7 @@ const Home = () => {
   const [cidadeFiltro, setCidadeFiltro] = useState('');
   const [carregando, setCarregando] = useState(false);
   const [favoritesModalOpen, setFavoritesModalOpen] = useState(false);
+  const [currentPlan, setCurrentPlan] = useState<PlanId>('FREE');
   const toastTimeoutRef = useRef(null);
 
   const showToastMessage = (message) => {
@@ -57,6 +66,12 @@ const Home = () => {
     const carregarDados = async () => {
       await carregarServicos();
       await carregarFavoritosIds();
+      try {
+        const status = await obterStatusAssinatura(true);
+        if (status.plan) setCurrentPlan(status.plan);
+      } catch (error) {
+        console.error(error);
+      }
     };
     carregarDados();
   }, []);
@@ -116,16 +131,24 @@ const Home = () => {
     showToastMessage(`✅ ${title} em desenvolvimento!`);
   };
 
-  // Fake announcements for professionals
+  const handleAssinarPlano = async (plan: PlanId, preco: number) => {
+    if (preco === 0 || plan === currentPlan) {
+      showToastMessage('Você já está neste plano!');
+      return;
+    }
+    try {
+      const { url } = await criarCheckoutAssinatura(plan, true);
+      if (url) window.location.href = url;
+      else showToastMessage('Erro ao abrir checkout');
+    } catch (error) {
+      console.error(error);
+      showToastMessage(
+        error instanceof Error ? error.message : 'Erro ao iniciar assinatura',
+      );
+    }
+  };
+
   const announcements = [
-    {
-      id: 1,
-      title: '💼 Premium Profissional',
-      description: 'Ganhe destaque nos resultados de busca!',
-      subText: 'Primeiro mês gratuito',
-      gradient: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-      icon: 'fa-gem',
-    },
     {
       id: 2,
       title: '📊 Relatórios Avançados',
@@ -180,6 +203,40 @@ const Home = () => {
     .announcement-card h4 { margin-bottom: 10px; font-size: 18px; display: flex; align-items: center; gap: 10px; }
     .announcement-card p { margin-bottom: 6px; font-size: 14px; opacity: 0.95; }
     .announcement-subtext { font-size: 12px; opacity: 0.85; font-style: italic; }
+    .premium-card-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .premium-card-header h4 { margin-bottom: 0; }
+    .premium-toggle-icon { font-size: 14px; transition: transform 0.3s; opacity: 0.9; }
+    .premium-toggle-icon.open { transform: rotate(180deg); }
+    .premium-collapsed-info p { margin-bottom: 6px; }
+    .plans-expanded { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+    .inner-plan {
+      background: rgba(255,255,255,0.15); backdrop-filter: blur(8px);
+      border-radius: 16px; padding: 18px; border: 1px solid rgba(255,255,255,0.25);
+      position: relative; cursor: default;
+    }
+    .inner-plan.inner-free { background: rgba(255,255,255,0.12); }
+    .inner-plan.inner-pro { background: rgba(255,255,255,0.18); }
+    .inner-plan.inner-premium { background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.4); }
+    .inner-plan-badge {
+      position: absolute; top: -10px; right: 16px;
+      background: #fef3c7; color: #92400e; font-size: 11px; font-weight: 700;
+      padding: 4px 12px; border-radius: 20px; display: flex; align-items: center; gap: 5px;
+    }
+    .inner-plan-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+    .inner-plan-nome { font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+    .inner-plan-preco { font-size: 22px; font-weight: 800; text-align: right; }
+    .inner-plan-preco-sub { font-size: 12px; opacity: 0.85; text-align: right; }
+    .inner-plan-beneficios { list-style: none; margin: 0 0 14px 0; padding: 0; }
+    .inner-plan-beneficios li {
+      font-size: 13px; padding: 4px 0; display: flex; align-items: center; gap: 8px; opacity: 0.95;
+    }
+    .inner-plan-beneficios li i { font-size: 12px; opacity: 0.85; }
+    .inner-plan-btn {
+      width: 100%; padding: 10px 16px; border: none; border-radius: 12px;
+      background: white; color: #ea580c; font-weight: 700; font-size: 14px;
+      cursor: pointer; transition: 0.2s;
+    }
+    .inner-plan-btn:hover { background: #fff7ed; transform: translateY(-1px); }
     .success-toast { position: fixed; top: 80px; right: 20px; padding: 14px 24px; border-radius: 40px; color: white; font-weight: 600; z-index: 9999; background: #f97316; box-shadow: 0 4px 15px rgba(249, 115, 22, 0.35); animation: fadeInOut 3s ease forwards; }
     @keyframes fadeInOut { 0% { opacity: 0; transform: translateX(20px); } 15% { opacity: 1; transform: translateX(0); } 85% { opacity: 1; transform: translateX(0); } 100% { opacity: 0; transform: translateX(20px); visibility: hidden; } }
     @media (max-width: 1024px) { 
@@ -407,6 +464,10 @@ const Home = () => {
             </span>
           </div>
           <div className="announcements-grid">
+            <PremiumPlansCard
+              currentPlan={currentPlan}
+              onSubscribe={handleAssinarPlano}
+            />
             {announcements.map((announcement) => (
               <div
                 key={announcement.id}

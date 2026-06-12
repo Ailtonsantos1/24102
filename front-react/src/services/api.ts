@@ -652,6 +652,56 @@ export async function listFavoriteServices(
   return res.json();
 }
 
+export type PlanId = 'FREE' | 'PRO' | 'PREMIUM';
+
+function subscriptionBase(isProfessional: boolean) {
+  return isProfessional ? '/professionals' : '/client';
+}
+
+export async function obterStatusAssinatura(isProfessional = false) {
+  const res = await fetch(
+    `${API_URL}${subscriptionBase(isProfessional)}/subscription/status`,
+    { method: 'GET', credentials: 'include' },
+  );
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.erro ?? 'Erro ao obter assinatura');
+  return json;
+}
+
+export async function criarCheckoutAssinatura(
+  plan: 'PRO' | 'PREMIUM',
+  isProfessional = false,
+) {
+  const res = await fetch(
+    `${API_URL}${subscriptionBase(isProfessional)}/subscription/checkout`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        plan,
+        userType: isProfessional ? 'PROFISSIONAL' : 'CLIENTE',
+      }),
+    },
+  );
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.erro ?? 'Erro ao iniciar checkout');
+  return json;
+}
+
+export async function confirmarAssinatura(
+  sessionId: string,
+  isProfessional = false,
+) {
+  const res = await fetch(
+    `${API_URL}${subscriptionBase(isProfessional)}/subscription/confirm?session_id=${encodeURIComponent(sessionId)}`,
+    { method: 'GET', credentials: 'include' },
+  );
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.erro ?? 'Erro ao confirmar assinatura');
+  return json;
+}
+
 export async function obterDadosUsuario() {
   const res = await fetch(`${API_URL}/auth/me`, {
     method: 'GET',

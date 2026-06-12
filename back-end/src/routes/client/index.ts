@@ -5,8 +5,25 @@ import { RatingController } from "../../controllers/client/ratingController.js";
 import { FavoritesController } from "../../controllers/FavoritesController.js";
 import { ConversationController } from "../../controllers/ConversationController.js";
 import { authenticateToken } from "../../middleware/authMiddleware.js";
+import { SubscriptionController } from "../../controllers/SubscriptionController.js";
 
 const router = Router();
+
+router.get(
+  "/subscription/status",
+  authenticateToken,
+  SubscriptionController.status,
+);
+router.post(
+  "/subscription/checkout",
+  authenticateToken,
+  SubscriptionController.createCheckout,
+);
+router.get(
+  "/subscription/confirm",
+  authenticateToken,
+  SubscriptionController.confirmSession,
+);
 
 // Rotas de serviços (criados por clientes)
 router.post("/services", authenticateToken, ServiceController.criar);

@@ -222,6 +222,33 @@ export const favorites = sqliteTable("favorites", {
     .$defaultFn(() => new Date()),
 });
 
+export const subscriptions = sqliteTable("subscriptions", {
+  id: int("id").primaryKey({ autoIncrement: true }),
+  user_id: int("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  user_type: text("user_type")
+    .notNull()
+    .$type<"CLIENTE" | "PROFISSIONAL">(),
+  plan: text("plan")
+    .notNull()
+    .$type<"FREE" | "PRO" | "PREMIUM">()
+    .default("FREE"),
+  stripe_customer_id: text("stripe_customer_id"),
+  stripe_subscription_id: text("stripe_subscription_id"),
+  status: text("status")
+    .notNull()
+    .$type<"active" | "past_due" | "canceled" | "trialing">()
+    .default("active"),
+  current_period_end: int("current_period_end", { mode: "timestamp_ms" }),
+  created_at: int("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updated_at: int("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
 export const favoriteServices = sqliteTable("favorite_services", {
   id: int("id").primaryKey({ autoIncrement: true }),
   user_id: int("user_id")
@@ -252,6 +279,17 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   professionalRatings: many(ratings, { relationName: "professional" }),
   sentFavorites: many(favorites, { relationName: "user" }),
   receivedFavorites: many(favorites, { relationName: "favorite_user" }),
+  subscription: one(subscriptions, {
+    fields: [users.id],
+    references: [subscriptions.user_id],
+  }),
+}));
+
+export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
+  user: one(users, {
+    fields: [subscriptions.user_id],
+    references: [users.id],
+  }),
 }));
 
 export const professionalProfilesRelations = relations(

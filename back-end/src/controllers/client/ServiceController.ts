@@ -1,7 +1,12 @@
 import type { Request, Response } from "express";
 import { db } from "../../db/connection.js";
 import { professionalServices, users } from "../../db/schema.js";
-import { eq, and, desc, count, or, like, type SQL } from "drizzle-orm";
+import { eq, and, desc, or, like, type SQL } from "drizzle-orm";
+import {
+  getClientLimits,
+  getClientOpenServicesCount,
+} from "../../services/subscriptionService.js";
+import { CLIENT_PLAN_LIMITS } from "../../lib/plans.js";
 
 export class ServiceController {
   static async criar(req: Request, res: Response) {
@@ -49,20 +54,15 @@ export class ServiceController {
     } = body;
 
     try {
-      // Check max 3 pending services per client
-      const [countResult] = await db
-        .select({ count: count() })
-        .from(professionalServices)
-        .where(
-          and(
-            eq(professionalServices.client_id, user.userId),
-            eq(professionalServices.status, "PENDENTE"),
-          ),
-        );
+      const limits = await getClientLimits(user.userId);
 
-      if (countResult.count >= 3) {
+      if (!limits.canCreateMore) {
+        const max = limits.maxOpenServices;
         return res.status(400).json({
-          erro: "Limite de 3 serviços abertos atingido. Finalize ou cancele um serviço para criar outro.",
+          erro: `Limite de ${max} serviços abertos atingido (plano ${limits.plan}). Finalize um serviço ou faça upgrade do plano.`,
+          plan: limits.plan,
+          maxOpenServices: max,
+          currentOpenServices: limits.currentOpenServices,
         });
       }
 
@@ -154,8 +154,19 @@ export class ServiceController {
         .where(and(...conditions))
         .orderBy(desc(professionalServices.created_at));
 
+      const limits = await getClientLimits(user.userId);
+      const pendingCount = await getClientOpenServicesCount(user.userId);
+
       console.log("✅", servicos.length, "serviço(s) encontrado(s)");
-      res.json({ servicos });
+      res.json({
+        servicos,
+        subscription: {
+          plan: limits.plan,
+          maxOpenServices: limits.maxOpenServices,
+          currentOpenServices: pendingCount,
+          canCreateMore: limits.canCreateMore,
+        },
+      });
     } catch (error) {
       console.error("❌ Erro ao listar serviços:", error);
       res.status(500).json({ erro: "Erro interno do servidor" });

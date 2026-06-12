@@ -9,6 +9,7 @@ import professionalAuthRoutes from "./routes/professional/authRoutes.js";
 import professionalRoutes from "./routes/professional/index.js";
 import clientRoutes from "./routes/client/index.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
+import stripeRoutes from "./routes/stripeRoutes.js";
 
 const app = express();
 
@@ -21,6 +22,10 @@ app.use(
     credentials: true,
   }),
 );
+
+// Stripe webhook precisa do body raw (antes do express.json)
+app.use("/stripe", stripeRoutes);
+
 app.use(express.json());
 app.use(cookieParser());
 
