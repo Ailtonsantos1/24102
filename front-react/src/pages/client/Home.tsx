@@ -139,6 +139,24 @@ const Home = () => {
     showToast(`✅ ${title} em desenvolvimento!`);
   };
 
+  const handleAssinarPlano = async (plan: PlanId, preco: number) => {
+    if (preco === 0 || plan === currentPlan) {
+      showToast('Você já está neste plano!');
+      return;
+    }
+    try {
+      const { url } = await criarCheckoutAssinatura(plan, false);
+      if (url) window.location.href = url;
+      else showToast('Erro ao abrir checkout', true);
+    } catch (error) {
+      console.error(error);
+      showToast(
+        error instanceof Error ? error.message : 'Erro ao iniciar assinatura',
+        true,
+      );
+    }
+  };
+
   const handleContact = () => {
     showToast('📞 Contato enviado com sucesso!');
     closeModal();
@@ -215,6 +233,37 @@ const Home = () => {
     .announcement-card h4 { margin-bottom: 10px; font-size: 18px; display: flex; align-items: center; gap: 10px; }
     .announcement-card p { margin-bottom: 6px; font-size: 14px; opacity: 0.95; }
     .announcement-subtext { font-size: 12px; opacity: 0.85; font-style: italic; }
+    .premium-card-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .premium-card-header h4 { margin-bottom: 0; }
+    .premium-toggle-icon { font-size: 14px; transition: transform 0.3s; opacity: 0.9; }
+    .premium-toggle-icon.open { transform: rotate(180deg); }
+    .premium-collapsed-info p { margin-bottom: 6px; }
+    .plans-expanded { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+    .inner-plan {
+      background: rgba(255,255,255,0.15); backdrop-filter: blur(8px);
+      border-radius: 16px; padding: 18px; border: 1px solid rgba(255,255,255,0.25);
+      position: relative; cursor: default;
+    }
+    .inner-plan-badge {
+      position: absolute; top: -10px; right: 16px;
+      background: #fef3c7; color: #92400e; font-size: 11px; font-weight: 700;
+      padding: 4px 12px; border-radius: 20px; display: flex; align-items: center; gap: 5px;
+    }
+    .inner-plan-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+    .inner-plan-nome { font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+    .inner-plan-preco { font-size: 22px; font-weight: 800; text-align: right; }
+    .inner-plan-preco-sub { font-size: 12px; opacity: 0.85; text-align: right; }
+    .inner-plan-beneficios { list-style: none; margin: 0 0 14px 0; padding: 0; }
+    .inner-plan-beneficios li {
+      font-size: 13px; padding: 4px 0; display: flex; align-items: center; gap: 8px; opacity: 0.95;
+    }
+    .inner-plan-btn {
+      width: 100%; padding: 10px 16px; border: none; border-radius: 12px;
+      background: white; color: #2563eb; font-weight: 700; font-size: 14px;
+      cursor: pointer; transition: 0.2s;
+    }
+    .inner-plan-btn:disabled { opacity: 0.7; cursor: default; }
+    .inner-plan-btn:hover:not(:disabled) { background: #eff6ff; transform: translateY(-1px); }
     .footer { background: #0f172a; color: white; margin-top: 40px; padding-top: 50px; }
     .footer-content { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 30px; padding: 0 40px 40px; }
     .footer-col h4 { margin-bottom: 20px; color: #3b82f6; font-size: 18px; }
@@ -421,6 +470,10 @@ const Home = () => {
               </h3>
             </div>
             <div className="announcements-grid">
+              <ClientPremiumPlansCard
+                currentPlan={currentPlan}
+                onSubscribe={handleAssinarPlano}
+              />
               {announcements.map((announcement) => (
                 <div
                   key={announcement.id}

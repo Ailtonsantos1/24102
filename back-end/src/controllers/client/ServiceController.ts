@@ -6,7 +6,6 @@ import {
   getClientLimits,
   getClientOpenServicesCount,
 } from "../../services/subscriptionService.js";
-import { CLIENT_PLAN_LIMITS } from "../../lib/plans.js";
 
 export class ServiceController {
   static async criar(req: Request, res: Response) {

@@ -27,6 +27,12 @@ const Services = () => {
   });
   const [cidadeInput, setCidadeInput] = useState('');
   const [cidadeFiltro, setCidadeFiltro] = useState('');
+  const [subscription, setSubscription] = useState({
+    plan: 'FREE',
+    maxOpenServices: 3,
+    currentOpenServices: 0,
+    canCreateMore: true,
+  });
   const toastTimeoutRef = useRef(null);
 
   const showToast = (msg, isError = false) => {
@@ -48,6 +54,7 @@ const Services = () => {
         cidade ? { cidade, busca: cidade } : undefined,
       );
       if (dados.servicos) setServicos(dados.servicos);
+      if (dados.subscription) setSubscription(dados.subscription);
     } catch (error) {
       console.error(error);
     }
@@ -201,7 +208,9 @@ const Services = () => {
     @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } .user-header { flex-direction: column; align-items: flex-start; } }
   `;
 
-  const canCreateNew = servicos.length < 3;
+  const pendingCount = servicos.filter((s) => s.status === 'PENDENTE').length;
+  const maxServices = subscription.maxOpenServices ?? 3;
+  const canCreateNew = subscription.canCreateMore ?? pendingCount < maxServices;
 
   return (
     <>
@@ -214,7 +223,7 @@ const Services = () => {
               Gerencie seus serviços{' '}
               {!canCreateNew && (
                 <span style={{ color: '#dc2626', fontWeight: 600 }}>
-                  (limite de 3 atingido)
+                  (limite de {maxServices} atingido — plano {subscription.plan})
                 </span>
               )}
             </p>
@@ -282,13 +291,20 @@ const Services = () => {
               <div className="progress-section">
                 <div className="progress-label">
                   <span>Ativos</span>
-                  <span>{servicos.length}/3</span>
+                  <span>
+                    {pendingCount}/{maxServices >= 999 ? '∞' : maxServices}
+                  </span>
                 </div>
                 <div className="progress-bar">
                   <div
                     className="progress-fill"
                     style={{
-                      width: `${Math.min((servicos.length / 3) * 100, 100)}%`,
+                      width: `${Math.min(
+                        maxServices >= 999
+                          ? (pendingCount > 0 ? 15 : 0)
+                          : (pendingCount / maxServices) * 100,
+                        100,
+                      )}%`,
                     }}
                   ></div>
                 </div>

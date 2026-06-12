@@ -1,8 +1,12 @@
-import React, { useState, useRef, ChangeEvent, FormEvent } from 'react';
+import React, { useState, useRef, useEffect, ChangeEvent, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Toast } from '../../components/Toast';
-import { criarServico, uploadMultipleImages } from '../../services/api';
+import {
+  criarServico,
+  uploadMultipleImages,
+  obterStatusAssinatura,
+} from '../../services/api';
 import {
   CATEGORIAS_SERVICO,
   SUBCATEGORIAS,
@@ -77,7 +81,22 @@ const PostService: React.FC = () => {
 
   const [fotos, setFotos] = useState<File[]>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [canCreateMore, setCanCreateMore] = useState(true);
+  const [planInfo, setPlanInfo] = useState({ plan: 'FREE', max: 3, current: 0 });
   const [toast, setToast] = useState<{ message: string; isError: boolean } | null>(null);
+
+  useEffect(() => {
+    obterStatusAssinatura(false)
+      .then((status) => {
+        setCanCreateMore(status.canCreateMore);
+        setPlanInfo({
+          plan: status.plan ?? 'FREE',
+          max: status.maxOpenServices ?? 3,
+          current: status.currentOpenServices ?? 0,
+        });
+      })
+      .catch(console.error);
+  }, []);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -165,6 +184,13 @@ const PostService: React.FC = () => {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!canCreateMore) {
+      mostrarToast(
+        `Limite de ${planInfo.max} serviços abertos (plano ${planInfo.plan}). Faça upgrade em Home.`,
+        true,
+      );
+      return;
+    }
     if (!validarFormulario() || isSubmitting) return;
 
     setIsSubmitting(true);

@@ -21,6 +21,7 @@ import LoginProfessional from './pages/professional/LoginProfessional';
 import CadastroProfessional from './pages/professional/CadastroProfessional';
 import OnboardingFlow from './pages/onboarding/OnboardingFlow';
 import OnboardingRoute from './components/OnboardingRoute';
+import SubscriptionSuccess from './pages/SubscriptionSuccess';
 
 function App() {
   return (
@@ -88,6 +89,14 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/client/subscription/success"
+          element={
+            <ProtectedRoute allowedType="CLIENTE">
+              <SubscriptionSuccess userType="CLIENTE" />
+            </ProtectedRoute>
+          }
+        />
         {/* Rotas do Profissional */}
         <Route path="/professional/login" element={<LoginProfessional />} />
         <Route
@@ -147,6 +156,14 @@ function App() {
           element={
             <ProtectedRoute allowedType="PROFISSIONAL">
               <ProfessionalProfile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/professional/subscription/success"
+          element={
+            <ProtectedRoute allowedType="PROFISSIONAL">
+              <SubscriptionSuccess userType="PROFISSIONAL" />
             </ProtectedRoute>
           }
         />
